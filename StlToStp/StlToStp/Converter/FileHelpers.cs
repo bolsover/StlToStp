@@ -22,5 +22,3 @@ namespace Bolsover.StlToStp.Converter
         }
     }
 }
-
-

@@ -40,6 +40,7 @@ namespace Bolsover.StlToStp.Converter
                 if (!delimiters.Contains(str[i]))
                     return i;
             }
+
             return -1;
         }
 
@@ -50,6 +51,7 @@ namespace Bolsover.StlToStp.Converter
                 if (delimiters.Contains(str[i]))
                     return i;
             }
+
             return -1;
         }
 

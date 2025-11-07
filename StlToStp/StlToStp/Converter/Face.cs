@@ -33,6 +33,7 @@ namespace Bolsover.StlToStp.Converter
                 if (i != FaceBounds.Count - 1)
                     writer.Write(",");
             }
+
             writer.WriteLine($"),#{Plane.Id},{(Dir ? ".T." : ".F.")});");
         }
 
@@ -40,15 +41,16 @@ namespace Bolsover.StlToStp.Converter
         {
             var startParenIndex = args.IndexOf('(');
             var endParenIndex = args.LastIndexOf(')');
-            
-            if (startParenIndex == -1 || endParenIndex == -1 || endParenIndex <= startParenIndex) 
+
+            if (startParenIndex == -1 || endParenIndex == -1 || endParenIndex <= startParenIndex)
                 return;
 
             ExtractFaceBounds(entityMap, args, startParenIndex, endParenIndex);
             ExtractPlaneAndDirection(entityMap, args, endParenIndex);
         }
 
-        private void ExtractFaceBounds(Dictionary<int, Entity> entityMap, string args, int startParenIndex, int endParenIndex)
+        private void ExtractFaceBounds(Dictionary<int, Entity> entityMap, string args, int startParenIndex,
+            int endParenIndex)
         {
             var boundsSection = args.Substring(startParenIndex + 1, endParenIndex - startParenIndex - 1)
                 .Replace("#", " ");
@@ -80,7 +82,7 @@ namespace Bolsover.StlToStp.Converter
                 {
                     Plane = entity as Plane;
                 }
-                
+
                 Dir = parts[1] == ".T.";
             }
         }

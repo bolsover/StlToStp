@@ -6,8 +6,6 @@ using System.Threading.Tasks;
 
 namespace Bolsover.StlToStp.Converter
 {
-
-
     public class STLReader
     {
         public static List<double> ReadStlAscii(string fileName)
@@ -38,7 +36,6 @@ namespace Bolsover.StlToStp.Converter
 
             return nodes;
         }
-
 
 
         public static async Task<List<double>> ReadStlAsciiAsync(string fileName)
@@ -275,7 +272,6 @@ namespace Bolsover.StlToStp.Converter
         }
 
 
-
         public static async Task<List<double>> ReadStlAsync(string fileName)
         {
             var nodes = new List<double>();
@@ -367,14 +363,11 @@ namespace Bolsover.StlToStp.Converter
         // Assume these async methods exist:
         // private static Task<List<double>> ReadStlAsciiAsync(string fileName) => Task.FromResult(new List<double>());
         // private static Task<List<double>> ReadStlBinaryAsync(string fileName) => Task.FromResult(new List<double>());
-        
-       public static  async Task<int> Convert(string inputFile, string outputFile, double tol = 1e-6)
-        {
-        
-            bool mergePlanar = false;
-      
 
-        
+        public static async Task<int> Convert(string inputFile, string outputFile, double tol = 1e-6)
+        {
+            bool mergePlanar = false;
+
 
             // Read STL file (async)
             List<double> nodes = await ReadStlAsync(inputFile);
@@ -398,7 +391,4 @@ namespace Bolsover.StlToStp.Converter
             return 0;
         }
     }
-    
-    
 }
-
