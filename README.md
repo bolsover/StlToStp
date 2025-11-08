@@ -1,4 +1,4 @@
-# StlToStp
+# StlStpConverter
 
 A C# Windows Forms application that converts STL (STereoLithography) files to STEP (ISO 10303) format. This tool supports both ASCII and binary STL formats and generates ISO 10303-21 STEP files compatible with most CAD software.
 
