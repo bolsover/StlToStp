@@ -13,12 +13,5 @@ namespace Bolsover.Converter
             using var writer = new StreamWriter(path, false, encoding);
             await writer.WriteAsync(contents);
         }
-
-        public static async Task<string> ReadAllTextAsync(string path, Encoding encoding = null)
-        {
-            encoding ??= Encoding.ASCII;
-            using var reader = new StreamReader(path, encoding);
-            return await reader.ReadToEndAsync();
-        }
     }
 }

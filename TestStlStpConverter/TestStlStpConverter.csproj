@@ -43,8 +43,7 @@
         </Reference>
     </ItemGroup>
     <ItemGroup>
-        <Compile Include="StlReaderTests.cs" />
-        <Compile Include="Tests.cs"/>
+        <Compile Include="StlStpConverterTests.cs" />
         <Compile Include="Properties\AssemblyInfo.cs"/>
     </ItemGroup>
     <ItemGroup>

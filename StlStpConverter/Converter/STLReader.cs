@@ -25,9 +25,9 @@ namespace Bolsover.Converter
                 {
                     var parts = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                     if (parts.Length != 4 || parts[0] != "vertex") continue;
-                    if (!double.TryParse(parts[1], out double x) ||
-                        !double.TryParse(parts[2], out double y) ||
-                        !double.TryParse(parts[3], out double z)) continue;
+                    if (!double.TryParse(parts[1], out var x) ||
+                        !double.TryParse(parts[2], out var y) ||
+                        !double.TryParse(parts[3], out var z)) continue;
                     nodes.Add(x);
                     nodes.Add(y);
                     nodes.Add(z);
@@ -62,40 +62,38 @@ namespace Bolsover.Converter
                     return nodes;
                 }
 
-                using (var fs = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.Read,
-                           bufferSize: 4096, useAsync: true))
-                using (var br = new BinaryReader(fs))
+                using var fs = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.Read,
+                    bufferSize: 4096, useAsync: true);
+                using var br = new BinaryReader(fs);
+                // Read an 80-byte header
+                br.ReadBytes(80);
+
+                // Read the number of triangles (uint32)
+                var tris = br.ReadUInt32();
+
+                // Pre-allocate list for performance
+                nodes.Capacity = (int)tris * 9;
+
+                // Buffer for one triangle (normal + 3 vertices + attribute)
+                var buffer = new byte[(3 + 9) * sizeof(float) + sizeof(ushort)];
+
+                for (var i = 0; i < tris; i++)
                 {
-                    // Read an 80-byte header
-                    br.ReadBytes(80);
+                    var bytesRead = await fs.ReadAsync(buffer, 0, buffer.Length);
+                    if (bytesRead != buffer.Length)
+                        throw new EndOfStreamException("Unexpected end of STL file.");
 
-                    // Read the number of triangles (uint32)
-                    uint tris = br.ReadUInt32();
+                    // Skip normal (first 3 floats)
+                    var offset = 3 * sizeof(float);
 
-                    // Pre-allocate list for performance
-                    nodes.Capacity = (int)tris * 9;
-
-                    // Buffer for one triangle (normal + 3 vertices + attribute)
-                    byte[] buffer = new byte[(3 + 9) * sizeof(float) + sizeof(ushort)];
-
-                    for (int i = 0; i < tris; i++)
+                    // Read 9 floats for vertices
+                    for (var j = 0; j < 9; j++)
                     {
-                        int bytesRead = await fs.ReadAsync(buffer, 0, buffer.Length);
-                        if (bytesRead != buffer.Length)
-                            throw new EndOfStreamException("Unexpected end of STL file.");
-
-                        // Skip normal (first 3 floats)
-                        int offset = 3 * sizeof(float);
-
-                        // Read 9 floats for vertices
-                        for (int j = 0; j < 9; j++)
-                        {
-                            float value = BitConverter.ToSingle(buffer, offset);
-                            nodes.Add(value);
-                            offset += sizeof(float);
-                        }
-                        // Skip attribute (last 2 bytes)
+                        var value = BitConverter.ToSingle(buffer, offset);
+                        nodes.Add(value);
+                        offset += sizeof(float);
                     }
+                    // Skip attribute (last 2 bytes)
                 }
             }
             catch (IOException ioEx)
@@ -128,7 +126,7 @@ namespace Bolsover.Converter
                 }
 
                 var fileInfo = new FileInfo(fileName);
-                long fileSize = fileInfo.Length;
+                var fileSize = fileInfo.Length;
 
                 // The minimum size of an empty ASCII STL file is 15 bytes
                 if (fileSize < 15)
@@ -138,11 +136,11 @@ namespace Bolsover.Converter
                 }
 
                 // Read the first 5 bytes to check for "solid"
-                byte[] firstBytes = new byte[5];
+                var firstBytes = new byte[5];
                 using (var fs = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.Read,
                            bufferSize: 4096, useAsync: true))
                 {
-                    int bytesRead = await fs.ReadAsync(firstBytes, 0, 5);
+                    var bytesRead = await fs.ReadAsync(firstBytes, 0, 5);
                     if (bytesRead < 5)
                     {
                         Console.WriteLine($@"Invalid STL file: {fileName}");
@@ -197,18 +195,15 @@ namespace Bolsover.Converter
             using var fs = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096,
                 useAsync: true);
             var bytesRead = await fs.ReadAsync(buffer, 0, checkSize);
-            string content = Encoding.ASCII.GetString(buffer, 0, bytesRead);
+            var content = Encoding.ASCII.GetString(buffer, 0, bytesRead);
             return content.Contains("facet");
         }
 
 
         public static async Task<int> Convert(string inputFile, string outputFile, double tol = 1e-6)
         {
-            var mergePlanar = false;
-
-
             // Read STL file (async)
-            List<double> nodes = await ReadStlAsync(inputFile);
+            var nodes = await ReadStlAsync(inputFile);
             if (nodes.Count / 9 == 0)
             {
                 Console.WriteLine($@"No triangles found in STL file: {inputFile}");
@@ -218,10 +213,10 @@ namespace Bolsover.Converter
             Console.WriteLine($@"Read {nodes.Count / 9} triangles from {inputFile}");
 
             // Build STEP body and write output
-            StepWriter se = new StepWriter();
+            var stepWriter = new StepWriter();
             int mergedEdgeCount = 0;
-            se.BuildTriBody(nodes, tol, ref mergedEdgeCount);
-            se.WriteStep(outputFile);
+            stepWriter.BuildTriBody(nodes, tol, ref mergedEdgeCount);
+            stepWriter.WriteStep(outputFile);
 
             Console.WriteLine($@"Merged {mergedEdgeCount} edges");
             Console.WriteLine($@"Exported STEP file: {outputFile}");

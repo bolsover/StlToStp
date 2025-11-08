@@ -52,7 +52,6 @@
         <Compile Include="Converter\EdgeCurve.cs" />
         <Compile Include="Converter\EdgeLoop.cs" />
         <Compile Include="Converter\Entity.cs" />
-        <Compile Include="Converter\EntityType.cs" />
         <Compile Include="Converter\Face.cs" />
         <Compile Include="Converter\FaceBound.cs" />
         <Compile Include="Converter\FileHelpers.cs" />

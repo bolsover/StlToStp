@@ -6,7 +6,7 @@ using Bolsover.Converter;
 namespace TestStlToStp
 {
     [TestFixture]
-    public class STLReaderTests
+    public class StlStpConverterTests
     {
         [Test]
         public async Task ReadStlAsync_ShouldReturnEmptyList_WhenFileDoesNotExist()
@@ -109,7 +109,7 @@ endsolid";
         [Test]
         public async Task TestConvert()
         {
-            var result = await StlReader.Convert("Pencil Case.stl", "Pencil Case.stp");
+            var result = await StlReader.Convert("Pencil Case.stl", "Pencil Case.stp", 0.0000001);
             Assert.AreEqual(0, result);
         }
      }  
