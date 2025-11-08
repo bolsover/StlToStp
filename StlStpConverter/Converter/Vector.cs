@@ -44,7 +44,7 @@ namespace Bolsover.Converter
             Dir = ResolveEntity<Direction>(entityMap, dirId);
         }
 
-        private string ParseArgumentString(string args, int start)
+        private static string ParseArgumentString(string args, int start)
         {
             return args.Substring(start + 1)
                 .Replace(",", " ")

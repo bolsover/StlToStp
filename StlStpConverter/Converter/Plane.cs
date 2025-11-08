@@ -35,7 +35,7 @@ namespace Bolsover.Converter
             }
         }
 
-        private int? ExtractCsysIdFromArgs(string args)
+        private static int? ExtractCsysIdFromArgs(string args)
         {
             var start = args.IndexOf(',');
             if (start == -1) return null;
@@ -53,7 +53,7 @@ namespace Bolsover.Converter
             return ids.Count > 0 ? ids[0] : (int?)null;
         }
 
-        private T GetEntityById<T>(Dictionary<int, Entity> entityMap, int id) where T : Entity
+        private static T GetEntityById<T>(Dictionary<int, Entity> entityMap, int id) where T : Entity
         {
             return entityMap.TryGetValue(id, out var entity) ? entity as T : null;
         }

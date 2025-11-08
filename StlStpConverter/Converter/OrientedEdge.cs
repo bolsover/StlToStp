@@ -42,7 +42,7 @@ namespace Bolsover.Converter
             ParseEdgeIdAndDirection(entityMap, argumentParts);
         }
 
-        private string[] ExtractArgumentString(string args)
+        private static string[] ExtractArgumentString(string args)
         {
             var start = args.IndexOf(',');
             if (start == -1) return null;

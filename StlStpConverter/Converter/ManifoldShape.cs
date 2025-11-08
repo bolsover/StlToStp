@@ -38,7 +38,7 @@ namespace Bolsover.Converter
             AssignEntitiesByType(firstEntity, secondEntity);
         }
 
-        private List<int> ParseEntityIds(string args)
+        private static List<int> ParseEntityIds(string args)
         {
             var start = args.IndexOf('(');
             var end = args.LastIndexOf(')');

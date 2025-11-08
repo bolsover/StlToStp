@@ -11,7 +11,7 @@ namespace TestStlToStp
         [Test]
         public async Task ReadStlAsync_ShouldReturnEmptyList_WhenFileDoesNotExist()
         {
-            var result = await STLReader.ReadStlAsync("nonexistent.stl");
+            var result = await StlReader.ReadStlAsync("nonexistent.stl");
             Assert.That(result, Is.Empty);
         }
 
@@ -21,7 +21,7 @@ namespace TestStlToStp
             string tempFile = Path.GetTempFileName();
             await FileHelpers.WriteAllTextAsync(tempFile, "tiny");
 
-            var result = await STLReader.ReadStlAsync(tempFile);
+            var result = await StlReader.ReadStlAsync(tempFile);
             Assert.That(result, Is.Empty);
 
             File.Delete(tempFile);
@@ -42,7 +42,7 @@ endfacet
 endsolid";
             await FileHelpers.WriteAllTextAsync(tempFile, asciiContent);
 
-            var result = await STLReader.ReadStlAsciiAsync(tempFile);
+            var result = await StlReader.ReadStlAsciiAsync(tempFile);
             Assert.That(result.Count, Is.EqualTo(9));
             Assert.That(result[0], Is.EqualTo(1.0));
             Assert.That(result[8], Is.EqualTo(9.0));
@@ -74,7 +74,7 @@ endsolid";
                 bw.Write((ushort)0); // attribute byte count
             }
 
-            var result = await STLReader.ReadStlBinaryAsync(tempFile);
+            var result = await StlReader.ReadStlBinaryAsync(tempFile);
             Assert.That(result.Count, Is.EqualTo(9));
             Assert.That(result[0], Is.EqualTo(1.0));
             Assert.That(result[8], Is.EqualTo(9.0));
@@ -97,7 +97,7 @@ endfacet
 endsolid";
             await FileHelpers.WriteAllTextAsync(tempFile, asciiContent);
 
-            var result = await STLReader.ReadStlAsync(tempFile);
+            var result = await StlReader.ReadStlAsync(tempFile);
             Assert.That(result.Count, Is.EqualTo(9));
             Assert.That(result[0], Is.EqualTo(1.0));
             Assert.That(result[8], Is.EqualTo(9.0));
@@ -109,7 +109,7 @@ endsolid";
         [Test]
         public async Task TestConvert()
         {
-            var result = await STLReader.Convert("Pencil Case.stl", "Pencil Case.stp");
+            var result = await StlReader.Convert("Pencil Case.stl", "Pencil Case.stp");
             Assert.AreEqual(0, result);
         }
      }  

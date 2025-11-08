@@ -11,7 +11,7 @@ namespace Bolsover.Converter
     {
         private List<Entity> Entities { get; } = new();
 
-        // Helper: Calculate normalized direction vector between two points
+        // Helper: Calculate a normalized direction vector between two points
         private static (double x, double y, double z, double distance) CalculateDirection(double[] from, double[] to)
         {
             var dx = to[0] - from[0];
@@ -29,7 +29,7 @@ namespace Bolsover.Converter
             return (dx, dy, dz, distance);
         }
 
-        // Helper: Calculate cross product of two vectors
+        // Helper: Calculate cross-product of two vectors
         private static double[] CrossProduct(double[] v1, double[] v2)
         {
             return new[]

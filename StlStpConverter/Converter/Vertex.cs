@@ -35,7 +35,7 @@ namespace Bolsover.Converter
             }
         }
 
-        private int ExtractPointIdFromArgs(string args)
+        private static int ExtractPointIdFromArgs(string args)
         {
             var start = args.IndexOf(',');
             if (start == -1) return 0;

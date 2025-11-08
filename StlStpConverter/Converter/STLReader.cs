@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Bolsover.Converter
 {
-    public class STLReader
+    public abstract class StlReader
     {
         public static async Task<List<double>> ReadStlAsciiAsync(string fileName)
         {
@@ -16,41 +16,34 @@ namespace Bolsover.Converter
             {
                 if (!File.Exists(fileName))
                 {
-                    Console.WriteLine($"File not found: {fileName}");
+                    Console.WriteLine($@"File not found: {fileName}");
                     return nodes;
                 }
 
-                using (var reader = new StreamReader(fileName))
+                using var reader = new StreamReader(fileName);
+                while (await reader.ReadLineAsync() is { } line)
                 {
-                    string? line;
-                    while ((line = await reader.ReadLineAsync()) != null)
-                    {
-                        var parts = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                        if (parts.Length == 4 && parts[0] == "vertex")
-                        {
-                            if (double.TryParse(parts[1], out double x) &&
-                                double.TryParse(parts[2], out double y) &&
-                                double.TryParse(parts[3], out double z))
-                            {
-                                nodes.Add(x);
-                                nodes.Add(y);
-                                nodes.Add(z);
-                            }
-                        }
-                    }
+                    var parts = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length != 4 || parts[0] != "vertex") continue;
+                    if (!double.TryParse(parts[1], out double x) ||
+                        !double.TryParse(parts[2], out double y) ||
+                        !double.TryParse(parts[3], out double z)) continue;
+                    nodes.Add(x);
+                    nodes.Add(y);
+                    nodes.Add(z);
                 }
             }
             catch (IOException ioEx)
             {
-                Console.WriteLine($"I/O error while reading file: {ioEx.Message}");
+                Console.WriteLine($@"I/O error while reading file: {ioEx.Message}");
             }
             catch (UnauthorizedAccessException uaEx)
             {
-                Console.WriteLine($"Access denied: {uaEx.Message}");
+                Console.WriteLine($@"Access denied: {uaEx.Message}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Unexpected error: {ex.Message}");
+                Console.WriteLine($@"Unexpected error: {ex.Message}");
             }
 
             return nodes;
@@ -65,7 +58,7 @@ namespace Bolsover.Converter
             {
                 if (!File.Exists(fileName))
                 {
-                    Console.WriteLine($"Failed to open binary STL file: {fileName}");
+                    Console.WriteLine($@"Failed to open binary STL file: {fileName}");
                     return nodes;
                 }
 
@@ -73,10 +66,10 @@ namespace Bolsover.Converter
                            bufferSize: 4096, useAsync: true))
                 using (var br = new BinaryReader(fs))
                 {
-                    // Read 80-byte header
+                    // Read an 80-byte header
                     br.ReadBytes(80);
 
-                    // Read number of triangles (uint32)
+                    // Read the number of triangles (uint32)
                     uint tris = br.ReadUInt32();
 
                     // Pre-allocate list for performance
@@ -107,15 +100,15 @@ namespace Bolsover.Converter
             }
             catch (IOException ioEx)
             {
-                Console.WriteLine($"I/O error while reading file: {ioEx.Message}");
+                Console.WriteLine($@"I/O error while reading file: {ioEx.Message}");
             }
             catch (UnauthorizedAccessException uaEx)
             {
-                Console.WriteLine($"Access denied: {uaEx.Message}");
+                Console.WriteLine($@"Access denied: {uaEx.Message}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Unexpected error: {ex.Message}");
+                Console.WriteLine($@"Unexpected error: {ex.Message}");
             }
 
             return nodes;
@@ -130,21 +123,21 @@ namespace Bolsover.Converter
             {
                 if (!File.Exists(fileName))
                 {
-                    Console.WriteLine($"Failed to open STL file: {fileName}");
+                    Console.WriteLine($@"Failed to open STL file: {fileName}");
                     return nodes;
                 }
 
                 var fileInfo = new FileInfo(fileName);
                 long fileSize = fileInfo.Length;
 
-                // Minimum size of an empty ASCII STL file is 15 bytes
+                // The minimum size of an empty ASCII STL file is 15 bytes
                 if (fileSize < 15)
                 {
-                    Console.WriteLine($"Invalid STL file: {fileName}");
+                    Console.WriteLine($@"Invalid STL file: {fileName}");
                     return nodes;
                 }
 
-                // Read first 5 bytes to check for "solid"
+                // Read the first 5 bytes to check for "solid"
                 byte[] firstBytes = new byte[5];
                 using (var fs = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.Read,
                            bufferSize: 4096, useAsync: true))
@@ -152,18 +145,18 @@ namespace Bolsover.Converter
                     int bytesRead = await fs.ReadAsync(firstBytes, 0, 5);
                     if (bytesRead < 5)
                     {
-                        Console.WriteLine($"Invalid STL file: {fileName}");
+                        Console.WriteLine($@"Invalid STL file: {fileName}");
                         return nodes;
                     }
                 }
 
-                string firstWord = Encoding.ASCII.GetString(firstBytes);
+                var firstWord = Encoding.ASCII.GetString(firstBytes);
 
                 if (firstWord == "solid")
                 {
-                    // Possible ASCII STL, but could be binary with "solid" in header
+                    // Possible ASCII STL, but could be binary with "solid" in the header
                     // Check further: read more content and look for "facet" keyword
-                    bool looksAscii = await LooksLikeAsciiAsync(fileName);
+                    var looksAscii = await LooksLikeAsciiAsync(fileName);
 
                     if (looksAscii)
                     {
@@ -181,15 +174,15 @@ namespace Bolsover.Converter
             }
             catch (IOException ioEx)
             {
-                Console.WriteLine($"I/O error: {ioEx.Message}");
+                Console.WriteLine($@"I/O error: {ioEx.Message}");
             }
             catch (UnauthorizedAccessException uaEx)
             {
-                Console.WriteLine($"Access denied: {uaEx.Message}");
+                Console.WriteLine($@"Access denied: {uaEx.Message}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Unexpected error: {ex.Message}");
+                Console.WriteLine($@"Unexpected error: {ex.Message}");
             }
 
             return nodes;
@@ -199,15 +192,13 @@ namespace Bolsover.Converter
         {
             // Heuristic: ASCII STL should contain "facet" somewhere in the first few KB
             const int checkSize = 1024; // 1 KB
-            byte[] buffer = new byte[checkSize];
+            var buffer = new byte[checkSize];
 
-            using (var fs = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096,
-                       useAsync: true))
-            {
-                int bytesRead = await fs.ReadAsync(buffer, 0, checkSize);
-                string content = Encoding.ASCII.GetString(buffer, 0, bytesRead);
-                return content.Contains("facet");
-            }
+            using var fs = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096,
+                useAsync: true);
+            var bytesRead = await fs.ReadAsync(buffer, 0, checkSize);
+            string content = Encoding.ASCII.GetString(buffer, 0, bytesRead);
+            return content.Contains("facet");
         }
 
 
@@ -220,11 +211,11 @@ namespace Bolsover.Converter
             List<double> nodes = await ReadStlAsync(inputFile);
             if (nodes.Count / 9 == 0)
             {
-                Console.WriteLine($"No triangles found in STL file: {inputFile}");
+                Console.WriteLine($@"No triangles found in STL file: {inputFile}");
                 return 1;
             }
 
-            Console.WriteLine($"Read {nodes.Count / 9} triangles from {inputFile}");
+            Console.WriteLine($@"Read {nodes.Count / 9} triangles from {inputFile}");
 
             // Build STEP body and write output
             StepWriter se = new StepWriter();
@@ -232,8 +223,8 @@ namespace Bolsover.Converter
             se.BuildTriBody(nodes, tol, ref mergedEdgeCount);
             se.WriteStep(outputFile);
 
-            Console.WriteLine($"Merged {mergedEdgeCount} edges");
-            Console.WriteLine($"Exported STEP file: {outputFile}");
+            Console.WriteLine($@"Merged {mergedEdgeCount} edges");
+            Console.WriteLine($@"Exported STEP file: {outputFile}");
 
             return 0;
         }
