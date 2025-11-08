@@ -16,24 +16,23 @@ A C# Windows Forms application that converts STL (STereoLithography) files to ST
 ```
 StlStpConverter/
 ├── StlStpConverter/                    # Main application
-│   ├── Converter/               # Core conversion logic
-│   │   ├── STLReader.cs        # STL file parser (ASCII & binary)
-│   │   ├── StepWriter.cs       # STEP file generation engine
-│   │   ├── Entity.cs           # Base entity class
-│   │   ├── Point.cs            # 3D point representation
-│   │   ├── Vector.cs           # 3D vector operations
-│   │   ├── Direction.cs        # Directional vectors
-│   │   ├── Plane.cs            # Planar surface definitions
-│   │   ├── Face.cs             # Face geometry
-│   │   ├── Edge*.cs            # Edge-related classes
-│   │   ├── Shell*.cs           # Shell model classes
-│   │   └── ...                 # Additional geometric entities
-│   ├── Form1.cs                # Main application form
-│   └── Program.cs              # Application entry point
-└── TestStlToStp/               # Unit tests
-    ├── StlReaderTests.cs       # STL reader tests
-    ├── Tests.cs                # General tests
-    └── *.stl                   # Test STL files
+│   ├── STLReader.cs        # STL file parser (ASCII & binary)
+│   ├── StepWriter.cs       # STEP file generation engine
+│   ├── Entity.cs           # Base entity class
+│   ├── Point.cs            # 3D point representation
+│   ├── Vector.cs           # 3D vector operations
+│   ├── Direction.cs        # Directional vectors
+│   ├── Plane.cs            # Planar surface definitions
+│   ├── Face.cs             # Face geometry
+│   ├── Edge*.cs            # Edge-related classes
+│   ├── Shell*.cs           # Shell model classes
+│   └── ...                 # Additional geometric entities
+│   ├── Form1.cs            # Main application form
+│   └── Program.cs          # Application entry point
+└── TestStlToStp/           # Unit tests
+    ├── StlReaderTests.cs   # STL reader tests
+    ├── Tests.cs            # General tests
+    └── *.stl               # Test STL files
 ```
 
 ## Requirements
@@ -76,7 +75,7 @@ StlStpConverter/
 ### Programmatic Usage
 
 ```csharp
-using Bolsover.StlToStp.Converter;
+using Bolsover.Converter;
 
 // Convert STL to STEP with default tolerance (1e-6)
 await STLReader.Convert("input.stl", "output.stp");
