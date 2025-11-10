@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 
 namespace Bolsover.Converter
@@ -19,7 +20,8 @@ namespace Bolsover.Converter
         // Serialize method
         public override void Serialize(StreamWriter writer)
         {
-            writer.WriteLine($"#{Id} = VECTOR('{Label}', #{Dir.Id}, {Length});");
+            writer.WriteLine(
+                $"#{Id} = VECTOR('{Label}', #{Dir.Id}, {Length.ToString("F10", CultureInfo.InvariantCulture)});");
         }
     }
 }

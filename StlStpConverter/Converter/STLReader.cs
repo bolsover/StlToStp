@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Bolsover.Converter
@@ -9,6 +10,12 @@ namespace Bolsover.Converter
     public abstract class StlReader
     {
         public static async Task<List<double>> ReadStlAsciiAsync(string fileName)
+        {
+            return await ReadStlAsciiAsync(fileName, CancellationToken.None, null);
+        }
+
+        public static async Task<List<double>> ReadStlAsciiAsync(string fileName, CancellationToken token,
+            IProgress<string> progress)
         {
             var nodes = new List<double>();
 
@@ -21,8 +28,10 @@ namespace Bolsover.Converter
                 }
 
                 using var reader = new StreamReader(fileName);
+                int lineCount = 0;
                 while (await reader.ReadLineAsync() is { } line)
                 {
+                    token.ThrowIfCancellationRequested();
                     var parts = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                     if (parts.Length != 4 || parts[0] != "vertex") continue;
                     if (!double.TryParse(parts[1], out var x) ||
@@ -31,6 +40,11 @@ namespace Bolsover.Converter
                     nodes.Add(x);
                     nodes.Add(y);
                     nodes.Add(z);
+                    lineCount++;
+                    if (lineCount % 3000 == 0)
+                    {
+                        progress?.Report($"Read {nodes.Count / 9} triangles so far (ASCII)...");
+                    }
                 }
             }
             catch (IOException ioEx)
@@ -51,6 +65,12 @@ namespace Bolsover.Converter
 
 
         public static async Task<List<double>> ReadStlBinaryAsync(string fileName)
+        {
+            return await ReadStlBinaryAsync(fileName, CancellationToken.None, null);
+        }
+
+        public static async Task<List<double>> ReadStlBinaryAsync(string fileName, CancellationToken token,
+            IProgress<string> progress)
         {
             var nodes = new List<double>();
 
@@ -79,6 +99,7 @@ namespace Bolsover.Converter
 
                 for (var i = 0; i < tris; i++)
                 {
+                    token.ThrowIfCancellationRequested();
                     var bytesRead = await fs.ReadAsync(buffer, 0, buffer.Length);
                     if (bytesRead != buffer.Length)
                         throw new EndOfStreamException("Unexpected end of STL file.");
@@ -114,6 +135,12 @@ namespace Bolsover.Converter
 
 
         public static async Task<List<double>> ReadStlAsync(string fileName)
+        {
+            return await ReadStlAsync(fileName, CancellationToken.None, null);
+        }
+
+        public static async Task<List<double>> ReadStlAsync(string fileName, CancellationToken token,
+            IProgress<string> progress)
         {
             var nodes = new List<double>();
 
@@ -154,20 +181,20 @@ namespace Bolsover.Converter
                 {
                     // Possible ASCII STL, but could be binary with "solid" in the header
                     // Check further: read more content and look for "facet" keyword
-                    var looksAscii = await LooksLikeAsciiAsync(fileName);
+                    var looksAscii = await LooksLikeAsciiAsync(fileName, token);
 
                     if (looksAscii)
                     {
-                        nodes = await ReadStlAsciiAsync(fileName);
+                        nodes = await ReadStlAsciiAsync(fileName, token, progress);
                     }
                     else
                     {
-                        nodes = await ReadStlBinaryAsync(fileName);
+                        nodes = await ReadStlBinaryAsync(fileName, token, progress);
                     }
                 }
                 else
                 {
-                    nodes = await ReadStlBinaryAsync(fileName);
+                    nodes = await ReadStlBinaryAsync(fileName, token, progress);
                 }
             }
             catch (IOException ioEx)
@@ -188,6 +215,11 @@ namespace Bolsover.Converter
 
         private static async Task<bool> LooksLikeAsciiAsync(string fileName)
         {
+            return await LooksLikeAsciiAsync(fileName, CancellationToken.None);
+        }
+
+        private static async Task<bool> LooksLikeAsciiAsync(string fileName, CancellationToken token)
+        {
             // Heuristic: ASCII STL should contain "facet" somewhere in the first few KB
             const int checkSize = 1024; // 1 KB
             var buffer = new byte[checkSize];
@@ -202,24 +234,41 @@ namespace Bolsover.Converter
 
         public static async Task<int> Convert(string inputFile, string outputFile, double tol = 1e-6)
         {
+            return await Convert(inputFile, outputFile, tol, CancellationToken.None, null);
+        }
+
+        public static async Task<int> Convert(string inputFile, string outputFile, double tol, CancellationToken token,
+            IProgress<string> progress)
+        {
+            progress?.Report($"Reading STL: {Path.GetFileName(inputFile)}...");
             // Read STL file (async)
-            var nodes = await ReadStlAsync(inputFile);
+            var nodes = await ReadStlAsync(inputFile, token, progress);
+            token.ThrowIfCancellationRequested();
             if (nodes.Count / 9 == 0)
             {
-                Console.WriteLine($@"No triangles found in STL file: {inputFile}");
+                var msg = $"No triangles found in STL file: {inputFile}";
+                progress?.Report(msg);
+                Console.WriteLine(@msg);
                 return 1;
             }
 
-            Console.WriteLine($@"Read {nodes.Count / 9} triangles from {inputFile}");
+            var triCount = nodes.Count / 9;
+            progress?.Report($"Read {triCount} triangles. Building STEP body...");
+            Console.WriteLine($@"Read {triCount} triangles from {inputFile}");
 
             // Build STEP body and write output
             var stepWriter = new StepWriter();
             int mergedEdgeCount = 0;
+            token.ThrowIfCancellationRequested();
             stepWriter.BuildTriBody(nodes, tol, ref mergedEdgeCount);
+            token.ThrowIfCancellationRequested();
+            progress?.Report($"Writing STEP: {Path.GetFileName(outputFile)}...");
             stepWriter.WriteStep(outputFile);
 
-            Console.WriteLine($@"Merged {mergedEdgeCount} edges");
+            var mergedMsg = $"Merged {mergedEdgeCount} edges";
+            Console.WriteLine(@mergedMsg);
             Console.WriteLine($@"Exported STEP file: {outputFile}");
+            progress?.Report($"Done. {mergedMsg}. Saved: {outputFile}");
 
             return 0;
         }

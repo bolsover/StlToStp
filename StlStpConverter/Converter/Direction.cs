@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 
@@ -22,7 +23,7 @@ namespace Bolsover.Converter
         // Serialize method
         public override void Serialize(StreamWriter stream)
         {
-            stream.WriteLine($"#{Id} = DIRECTION('{Label}', ({X}, {Y}, {Z}));");
+            stream.WriteLine($"#{Id} = DIRECTION('{Label}', ({X},{Y},{Z}));");
         }
     }
 }

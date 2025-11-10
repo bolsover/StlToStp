@@ -6,8 +6,8 @@ namespace Bolsover.Converter
 {
     public abstract class Entity
     {
-        public int Id { get;  }
-        public string Label { get;  }
+        public int Id { get; }
+        public string Label { get; }
 
         protected Entity(List<Entity> entityList)
         {
@@ -15,8 +15,6 @@ namespace Bolsover.Converter
             Id = entityList.Count; // IDs start at 1
         }
 
-
-        // Abstract methods
         public abstract void Serialize(StreamWriter writer);
     }
 }

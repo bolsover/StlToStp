@@ -109,7 +109,7 @@ endsolid";
         [Test]
         public async Task TestConvert()
         {
-            var result = await StlReader.Convert("Pencil Case.stl", "Pencil Case.stp", 0.0000001);
+            var result = await StlReader.Convert("Cube.stl", "Cube.stp", 0.0000001);
             Assert.AreEqual(0, result);
         }
      }  

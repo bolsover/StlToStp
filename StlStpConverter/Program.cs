@@ -1,6 +1,5 @@
 using System;
 using System.Windows.Forms;
-using Bolsover.StlToStp;
 
 namespace Bolsover
 {
@@ -14,7 +13,7 @@ namespace Bolsover
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new Form1());
+            Application.Run(new StlStpForm());
         }
     }
 }
