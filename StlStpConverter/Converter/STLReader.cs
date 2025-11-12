@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers; // <-- requires System.Buffers NuGet
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -9,12 +10,176 @@ namespace Bolsover.Converter
 {
     public abstract class StlReader
     {
-        public static async Task<List<double>> ReadStlAsciiAsync(string fileName)
+        public static async Task<List<double>> ReadStlAsync(string fileName, CancellationToken token,
+            IProgress<string> progress)
         {
-            return await ReadStlAsciiAsync(fileName, CancellationToken.None, null);
-        }
+            var nodes = new List<double>();
 
-        public static async Task<List<double>> ReadStlAsciiAsync(string fileName, CancellationToken token,
+            try
+            {
+                if (!File.Exists(fileName))
+                {
+                    Console.WriteLine($"Failed to open STL file: {fileName}");
+                    return nodes;
+                }
+
+                var fileInfo = new FileInfo(fileName);
+                var fileSize = fileInfo.Length;
+                if (fileSize < 15)
+                {
+                    Console.WriteLine($"Invalid STL file: {fileName}");
+                    return nodes;
+                }
+
+                // Peek first 5 bytes for "solid"
+                var firstBytes = new byte[5];
+                using (var fsPeek = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.Read,
+                           bufferSize: 64 * 1024, useAsync: true))
+                {
+                    var bytesRead = await fsPeek.ReadAsync(firstBytes, 0, 5, token).ConfigureAwait(false);
+                    if (bytesRead < 5)
+                    {
+                        Console.WriteLine($"Invalid STL file: {fileName}");
+                        return nodes;
+                    }
+                }
+
+                var firstWord = Encoding.ASCII.GetString(firstBytes);
+
+                // Heuristic: ASCII if starts with "solid" and LooksLikeAsciiAsync says true; else binary
+                if (firstWord == "solid")
+                {
+                    var looksAscii = await LooksLikeAsciiAsync(fileName, token).ConfigureAwait(false);
+                    if (looksAscii)
+                    {
+                        // Use your existing ASCII parser
+                        nodes = await ReadStlAsciiAsync(fileName, token, progress).ConfigureAwait(false);
+                        return nodes;
+                    }
+                }
+
+                // Binary fast path using Buffer.BlockCopy + ArrayPool<float>
+                nodes = await ReadBinaryWithBlockCopyAsync(fileName, token, progress).ConfigureAwait(false);
+            }
+            catch (IOException ioEx)
+            {
+                Console.WriteLine($"I/O error: {ioEx.Message}");
+            }
+            catch (UnauthorizedAccessException uaEx)
+            {
+                Console.WriteLine($"Access denied: {uaEx.Message}");
+            }
+            catch (OperationCanceledException)
+            {
+                // Swallow cancellation (propagate if you prefer)
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Unexpected error: {ex.Message}");
+            }
+
+            return nodes;
+
+            // Local function: binary reader using pooled float[] and Buffer.BlockCopy
+            static async Task<List<double>> ReadBinaryWithBlockCopyAsync(string path, CancellationToken ct, IProgress<string> prog)
+            {
+                const int TriBytes = 50;     // 12 floats (48 bytes) + 2 attribute bytes
+                const int FloatsPerTri = 12; // 3 normal + 9 vertex
+
+                using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,
+                    bufferSize: 64 * 1024, useAsync: true);
+
+                // Read 80-byte header + 4-byte triangle count
+                var header = new byte[84];
+                int hdrRead = await ReadExactlyAsync(fs, header, 0, 84, ct).ConfigureAwait(false);
+                if (hdrRead != 84) throw new EndOfStreamException("Short STL header");
+
+                uint tris = BitConverter.ToUInt32(header, 80);
+                long remainingBytes = (long)tris * TriBytes;
+
+                var result = new List<double>(checked((int)tris * 9)); // 9 coordinates per triangle
+
+                // Choose a reasonable number of triangles per chunk to limit working set
+                // Example: ~8 MB chunks => 8*1024*1024 / 50 ≈ 167,772 tris per chunk (upper bound).
+                // We'll clamp to something smaller to keep float buffers modest.
+                const int MaxTrisPerChunk = 80_000;
+
+                long trianglesRead = 0;
+                while (remainingBytes > 0)
+                {
+                    ct.ThrowIfCancellationRequested();
+
+                    int trisThisChunk = (int)Math.Min(MaxTrisPerChunk, remainingBytes / TriBytes);
+                    int bytesThisChunk = trisThisChunk * TriBytes;
+                    if (bytesThisChunk == 0) break;
+
+                    // Read exactly the bytes for this chunk
+                    var chunk = ArrayPool<byte>.Shared.Rent(bytesThisChunk);
+                    try
+                    {
+                        int got = await ReadExactlyAsync(fs, chunk, 0, bytesThisChunk, ct).ConfigureAwait(false);
+                        if (got != bytesThisChunk) throw new EndOfStreamException("Unexpected end of STL file");
+
+                        // Rent float buffer for the 12 floats per triangle (normal + verts)
+                        int totalFloats = trisThisChunk * FloatsPerTri; // 12*tris
+                        var floats = ArrayPool<float>.Shared.Rent(totalFloats);
+                        try
+                        {
+                            // Copy 48 bytes of floats per triangle (skip 2-byte attribute) into float buffer
+                            int src = 0; // in bytes
+                            int dst = 0; // in bytes into float[]
+                            for (int t = 0; t < trisThisChunk; t++)
+                            {
+                                Buffer.BlockCopy(chunk, src, floats, dst, 48); // 12 floats
+                                src += TriBytes; // advance by 50
+                                dst += 48;       // advance by 48
+                            }
+
+                            // Consume the floats: skip the 3 normal floats and add the 9 vertex floats
+                            int f = 0;
+                            for (int t = 0; t < trisThisChunk; t++)
+                            {
+                                f += 3; // skip normal
+                                result.Add(floats[f++]); result.Add(floats[f++]); result.Add(floats[f++]);
+                                result.Add(floats[f++]); result.Add(floats[f++]); result.Add(floats[f++]);
+                                result.Add(floats[f++]); result.Add(floats[f++]); result.Add(floats[f++]);
+                            }
+                        }
+                        finally
+                        {
+                            ArrayPool<float>.Shared.Return(floats);
+                        }
+                    }
+                    finally
+                    {
+                        ArrayPool<byte>.Shared.Return(chunk);
+                    }
+
+                    remainingBytes -= bytesThisChunk;
+                    trianglesRead += trisThisChunk;
+
+                    if ((trianglesRead & 0x1FFF) == 0) // every ~8192 tris
+                        prog?.Report($"Read {trianglesRead} triangles so far (binary)...");
+                }
+
+                return result;
+            }
+
+            // Helper to read an exact number of bytes (like Stream.ReadExactly in newer .NET)
+            static async Task<int> ReadExactlyAsync(Stream s, byte[] buffer, int offset, int count, CancellationToken ct)
+            {
+                int total = 0;
+                while (total < count)
+                {
+                    int read = await s.ReadAsync(buffer, offset + total, count - total, ct).ConfigureAwait(false);
+                    if (read == 0) break;
+                    total += read;
+                }
+                return total;
+            }
+        }
+        
+        private static async Task<List<double>> ReadStlAsciiAsync(string fileName, CancellationToken token,
             IProgress<string> progress)
         {
             var nodes = new List<double>();
@@ -28,7 +193,7 @@ namespace Bolsover.Converter
                 }
 
                 using var reader = new StreamReader(fileName);
-                int lineCount = 0;
+                var lineCount = 0;
                 while (await reader.ReadLineAsync() is { } line)
                 {
                     token.ThrowIfCancellationRequested();
@@ -63,161 +228,7 @@ namespace Bolsover.Converter
             return nodes;
         }
 
-
-        public static async Task<List<double>> ReadStlBinaryAsync(string fileName)
-        {
-            return await ReadStlBinaryAsync(fileName, CancellationToken.None, null);
-        }
-
-        public static async Task<List<double>> ReadStlBinaryAsync(string fileName, CancellationToken token,
-            IProgress<string> progress)
-        {
-            var nodes = new List<double>();
-
-            try
-            {
-                if (!File.Exists(fileName))
-                {
-                    Console.WriteLine($@"Failed to open binary STL file: {fileName}");
-                    return nodes;
-                }
-
-                using var fs = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.Read,
-                    bufferSize: 4096, useAsync: true);
-                using var br = new BinaryReader(fs);
-                // Read an 80-byte header
-                br.ReadBytes(80);
-
-                // Read the number of triangles (uint32)
-                var tris = br.ReadUInt32();
-
-                // Pre-allocate list for performance
-                nodes.Capacity = (int)tris * 9;
-
-                // Buffer for one triangle (normal + 3 vertices + attribute)
-                var buffer = new byte[(3 + 9) * sizeof(float) + sizeof(ushort)];
-
-                for (var i = 0; i < tris; i++)
-                {
-                    token.ThrowIfCancellationRequested();
-                    var bytesRead = await fs.ReadAsync(buffer, 0, buffer.Length);
-                    if (bytesRead != buffer.Length)
-                        throw new EndOfStreamException("Unexpected end of STL file.");
-
-                    // Skip normal (first 3 floats)
-                    var offset = 3 * sizeof(float);
-
-                    // Read 9 floats for vertices
-                    for (var j = 0; j < 9; j++)
-                    {
-                        var value = BitConverter.ToSingle(buffer, offset);
-                        nodes.Add(value);
-                        offset += sizeof(float);
-                    }
-                    // Skip attribute (last 2 bytes)
-                }
-            }
-            catch (IOException ioEx)
-            {
-                Console.WriteLine($@"I/O error while reading file: {ioEx.Message}");
-            }
-            catch (UnauthorizedAccessException uaEx)
-            {
-                Console.WriteLine($@"Access denied: {uaEx.Message}");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($@"Unexpected error: {ex.Message}");
-            }
-
-            return nodes;
-        }
-
-
-        public static async Task<List<double>> ReadStlAsync(string fileName)
-        {
-            return await ReadStlAsync(fileName, CancellationToken.None, null);
-        }
-
-        public static async Task<List<double>> ReadStlAsync(string fileName, CancellationToken token,
-            IProgress<string> progress)
-        {
-            var nodes = new List<double>();
-
-            try
-            {
-                if (!File.Exists(fileName))
-                {
-                    Console.WriteLine($@"Failed to open STL file: {fileName}");
-                    return nodes;
-                }
-
-                var fileInfo = new FileInfo(fileName);
-                var fileSize = fileInfo.Length;
-
-                // The minimum size of an empty ASCII STL file is 15 bytes
-                if (fileSize < 15)
-                {
-                    Console.WriteLine($@"Invalid STL file: {fileName}");
-                    return nodes;
-                }
-
-                // Read the first 5 bytes to check for "solid"
-                var firstBytes = new byte[5];
-                using (var fs = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.Read,
-                           bufferSize: 4096, useAsync: true))
-                {
-                    var bytesRead = await fs.ReadAsync(firstBytes, 0, 5);
-                    if (bytesRead < 5)
-                    {
-                        Console.WriteLine($@"Invalid STL file: {fileName}");
-                        return nodes;
-                    }
-                }
-
-                var firstWord = Encoding.ASCII.GetString(firstBytes);
-
-                if (firstWord == "solid")
-                {
-                    // Possible ASCII STL, but could be binary with "solid" in the header
-                    // Check further: read more content and look for "facet" keyword
-                    var looksAscii = await LooksLikeAsciiAsync(fileName, token);
-
-                    if (looksAscii)
-                    {
-                        nodes = await ReadStlAsciiAsync(fileName, token, progress);
-                    }
-                    else
-                    {
-                        nodes = await ReadStlBinaryAsync(fileName, token, progress);
-                    }
-                }
-                else
-                {
-                    nodes = await ReadStlBinaryAsync(fileName, token, progress);
-                }
-            }
-            catch (IOException ioEx)
-            {
-                Console.WriteLine($@"I/O error: {ioEx.Message}");
-            }
-            catch (UnauthorizedAccessException uaEx)
-            {
-                Console.WriteLine($@"Access denied: {uaEx.Message}");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($@"Unexpected error: {ex.Message}");
-            }
-
-            return nodes;
-        }
-
-        private static async Task<bool> LooksLikeAsciiAsync(string fileName)
-        {
-            return await LooksLikeAsciiAsync(fileName, CancellationToken.None);
-        }
-
+       
         private static async Task<bool> LooksLikeAsciiAsync(string fileName, CancellationToken token)
         {
             // Heuristic: ASCII STL should contain "facet" somewhere in the first few KB
@@ -230,14 +241,14 @@ namespace Bolsover.Converter
             var content = Encoding.ASCII.GetString(buffer, 0, bytesRead);
             return content.Contains("facet");
         }
-
-
-        public static async Task<int> Convert(string inputFile, string outputFile, double tol = 1e-6)
+        
+  
+        public static async Task<int> ConvertToStp(string inputFile, string outputFile, double tol = 1e-6)
         {
-            return await Convert(inputFile, outputFile, tol, CancellationToken.None, null);
+            return await ConvertToStp(inputFile, outputFile, tol, CancellationToken.None, null);
         }
 
-        public static async Task<int> Convert(string inputFile, string outputFile, double tol, CancellationToken token,
+        public static async Task<int> ConvertToStp(string inputFile, string outputFile, double tol, CancellationToken token,
             IProgress<string> progress)
         {
             progress?.Report($"Reading STL: {Path.GetFileName(inputFile)}...");
@@ -248,17 +259,17 @@ namespace Bolsover.Converter
             {
                 var msg = $"No triangles found in STL file: {inputFile}";
                 progress?.Report(msg);
-                Console.WriteLine(@msg);
+               // Console.WriteLine(@msg);
                 return 1;
             }
 
             var triCount = nodes.Count / 9;
             progress?.Report($"Read {triCount} triangles. Building STEP body...");
-            Console.WriteLine($@"Read {triCount} triangles from {inputFile}");
+            //Console.WriteLine($@"Read {triCount} triangles from {inputFile}");
 
             // Build STEP body and write output
             var stepWriter = new StepWriter();
-            int mergedEdgeCount = 0;
+            var mergedEdgeCount = 0;
             token.ThrowIfCancellationRequested();
             stepWriter.BuildTriBody(nodes, tol, ref mergedEdgeCount);
             token.ThrowIfCancellationRequested();
@@ -266,8 +277,8 @@ namespace Bolsover.Converter
             stepWriter.WriteStep(outputFile);
 
             var mergedMsg = $"Merged {mergedEdgeCount} edges";
-            Console.WriteLine(@mergedMsg);
-            Console.WriteLine($@"Exported STEP file: {outputFile}");
+            progress?.Report(@mergedMsg);
+            progress?.Report($@"Exported STEP file: {outputFile}");
             progress?.Report($"Done. {mergedMsg}. Saved: {outputFile}");
 
             return 0;

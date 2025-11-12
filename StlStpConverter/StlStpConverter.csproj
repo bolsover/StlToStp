@@ -35,8 +35,19 @@
         <WarningLevel>4</WarningLevel>
     </PropertyGroup>
     <ItemGroup>
+        <Reference Include="Microsoft.Bcl.HashCode, Version=6.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+          <HintPath>..\packages\Microsoft.Bcl.HashCode.6.0.0\lib\net462\Microsoft.Bcl.HashCode.dll</HintPath>
+        </Reference>
+        <Reference Include="mscorlib" />
         <Reference Include="System"/>
+        <Reference Include="System.Buffers, Version=4.0.5.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+          <HintPath>..\packages\System.Buffers.4.6.1\lib\net462\System.Buffers.dll</HintPath>
+        </Reference>
+        <Reference Include="System.ComponentModel.Composition" />
         <Reference Include="System.Core"/>
+        <Reference Include="System.Runtime, Version=4.1.1.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+          <HintPath>..\packages\System.Runtime.4.3.0\lib\net462\System.Runtime.dll</HintPath>
+        </Reference>
         <Reference Include="System.Xml.Linq"/>
         <Reference Include="System.Data.DataSetExtensions"/>
         <Reference Include="Microsoft.CSharp"/>
@@ -99,6 +110,7 @@
         <EmbeddedResource Include="StlStpControl.resx">
           <DependentUpon>StlStpControl.cs</DependentUpon>
         </EmbeddedResource>
+        <None Include="packages.config" />
         <None Include="Properties\Settings.settings">
             <Generator>SettingsSingleFileGenerator</Generator>
             <LastGenOutput>Settings.Designer.cs</LastGenOutput>
@@ -113,8 +125,8 @@
         <None Include="App.config"/>
     </ItemGroup>
     <ItemGroup>
-      <Content Include="AlibreImportStlAsStepl.iss" />
       <Content Include="nexus.ico" />
+      <Content Include="StlStpConverterInstall.iss" />
     </ItemGroup>
     <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets"/>
 </Project>

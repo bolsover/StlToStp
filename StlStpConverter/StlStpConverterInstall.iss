@@ -24,7 +24,7 @@ DefaultGroupName={#MyAppName}
 ;PrivilegesRequired=lowest
 OutputDir=D:\02_Repository\02_Bolsover\StlStpConverter\StlStpConverter\bin\Release\Setup
 OutputBaseFilename=StlStpConverter
-SetupIconFile=D:\02_Repository\02_Bolsover\StlStpConverter\StlStpConverter\bin\Debug\nexus.ico
+SetupIconFile=D:\02_Repository\02_Bolsover\StlStpConverter\StlStpConverter\nexus.ico
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
@@ -35,8 +35,8 @@ ArchitecturesInstallIn64BitMode=x64os
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
-Source: "D:\02_Repository\02_Bolsover\StlStpConverter\StlStpConverter\bin\Debug\nexus.ico"; DestDir: "{app}"; Flags: ignoreversion
-Source: "D:\02_Repository\02_Bolsover\StlStpConverter\StlStpConverter\bin\Debug\\StlStpConverter.exe"; DestDir: "{app}"; Flags: ignoreversion
+;Source: "D:\02_Repository\02_Bolsover\StlStpConverter\StlStpConverter\bin\Debug\nexus.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "D:\02_Repository\02_Bolsover\StlStpConverter\StlStpConverter\bin\Release\StlStpConverter.exe"; DestDir: "{app}"; Flags: ignoreversion
 ;Source: "D:\02_Repository\02_Bolsover\AlibreImportStlAsStep\AlibreImportStlAsStep\bin\Release\net481\AlibreImportStlAsStep.adc"; DestDir: "{app}"; Flags: ignoreversion
 ;Source: "D:\02_Repository\02_Bolsover\AlibreImportStlAsStep\AlibreImportStlAsStep\bin\Release\net481\AlibreImportStlAsStep.dll"; DestDir: "{app}"; Flags: ignoreversion
 ;Source: "D:\02_Repository\02_Bolsover\AlibreImportStlAsStep\AlibreImportStlAsStep\bin\Release\net481\stltostp.exe"; DestDir: "{app}"; Flags: ignoreversion

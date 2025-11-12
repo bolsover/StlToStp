@@ -98,7 +98,7 @@ namespace Bolsover
             _cts = new CancellationTokenSource();
             var token = _cts.Token;
 
-            var progress = new Progress<string>(msg => { _converterParams.Message = msg; });
+            IProgress<string> progress = new Progress<string>(msg => { _converterParams.Message = msg; });
             _converterParams.Message = @"Converting file... Please wait";
 
             try
@@ -110,19 +110,62 @@ namespace Bolsover
                     tol = tolUi;
                 }
 
-                var result = await StlReader.Convert(_converterParams.InFile, _converterParams.OutFile, tol, token,
-                    progress);
+                // First, read STL to get triangle data and count
+                _converterParams.Message = $"Reading STL: {Path.GetFileName(_converterParams.InFile)}...";
+                var nodes = await StlReader.ReadStlAsync(_converterParams.InFile, token, progress);
+                token.ThrowIfCancellationRequested();
+
+                var triCount = nodes.Count / 9;
+                if (triCount == 0)
+                {
+                    _converterParams.Message = $"No triangles found in STL file: {_converterParams.InFile}";
+                    return;
+                }
+
+                // If user asked to open after and model is large, prompt with modal dialog
+                var openAfter = _converterParams.OpenConverted;
+                if (openAfter && triCount > 10000)
+                {
+                    var dlgResult = MessageBox.Show(
+                        this,
+                        $"The selected STL contains {triCount:N0} triangles.\n\n" +
+                        "Opening the converted STEP file may be slow and resource intensive.\n\n" +
+                        "Yes: Convert and open after.\n" +
+                        "No: Convert but do not open.\n" +
+                        "Cancel: Cancel the conversion.",
+                        "Large model warning",
+                        MessageBoxButtons.YesNoCancel,
+                        MessageBoxIcon.Warning,
+                        MessageBoxDefaultButton.Button2);
+
+                    if (dlgResult == DialogResult.Cancel)
+                    {
+                        _converterParams.Message = @"Conversion cancelled by user";
+                        return;
+                    }
+                    openAfter = dlgResult == DialogResult.Yes;
+                }
+
+                _converterParams.Message = $"Read {triCount:N0} triangles. Building STEP body...";
+
+                // Build STEP model from nodes
+                var stepWriter = new StepWriter();
+                var mergedEdgeCount = 0;
+                token.ThrowIfCancellationRequested();
+                stepWriter.BuildTriBody(nodes, tol, ref mergedEdgeCount);
+                token.ThrowIfCancellationRequested();
+
+                _converterParams.Message = $"Writing STEP: {Path.GetFileName(_converterParams.OutFile)}...";
+                stepWriter.WriteStep(_converterParams.OutFile);
 
                 if (!token.IsCancellationRequested)
                 {
-                    _converterParams.Message =
-                        result == 0 ? @"Conversion complete" : @"Conversion finished with issues";
+                    _converterParams.Message = @"Conversion complete";
 
-                    if (result == 0 && _converterParams.OpenConverted)
+                    if (openAfter)
                     {
                         try
                         {
-                           
                             Process.Start(_converterParams.OutFile);
                         }
                         catch
