@@ -1,0 +1,11 @@
+<AlibreDesignAddOn specificationVersion="2" friendlyName="Alibre Stl Stp Converter">
+<Author name="David Bolsover" link="https://github.com/bolsover/StlStpConverter"/>
+   <Copyright>Copyright (c) 2024. David Bolsover</Copyright>
+   <DLL type="Managed" loadedWhen="Startup" location="AlibreStlStpConverter.dll"/>
+   <Icon location="3DPrint.ico"/> 
+   <Menu text="Stl Stp Converter"/>
+   <Description>Alibre Stl Stp Converter</Description> 
+   <Workspace type="Always"/>
+   <Property name="Identifier" value="{373629C4-F122-9717-92E0-E22A974F9AA8}"/>
+</AlibreDesignAddOn>
+

@@ -4,6 +4,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StlStpConverter", "StlStpCo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestStlStpConverter", "TestStlStpConverter\TestStlStpConverter.csproj", "{17048E5D-B4D6-4F04-9AF6-AE9985E65309}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AlibreStlStpConverter", "AlibreStlStpConverter\AlibreStlStpConverter.csproj", "{1DB05150-CB47-47F1-9024-1E49F82D6C0F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -18,5 +20,9 @@ Global
 		{17048E5D-B4D6-4F04-9AF6-AE9985E65309}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{17048E5D-B4D6-4F04-9AF6-AE9985E65309}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{17048E5D-B4D6-4F04-9AF6-AE9985E65309}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1DB05150-CB47-47F1-9024-1E49F82D6C0F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1DB05150-CB47-47F1-9024-1E49F82D6C0F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1DB05150-CB47-47F1-9024-1E49F82D6C0F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1DB05150-CB47-47F1-9024-1E49F82D6C0F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
