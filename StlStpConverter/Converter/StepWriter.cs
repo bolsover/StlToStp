@@ -16,20 +16,31 @@ namespace Bolsover.Converter
         // ID assignment and registration
         private int _nextId = 1;
         private int NextId() => _nextId++;
+
         private T Register<T>(T e) where T : IEntity
         {
             Entities.Add(e);
             return e;
         }
 
+        // Number of coordinate values per triangle (3 vertices × 3 coordinates).
+        private const int ValuesPerTriangle = 9;
 
-       /// <summary>
-       /// Calculate direction vector from two points.
-       /// </summary>
-       /// <param name="from"></param>
-       /// <param name="to"></param>
-       /// <returns></returns>
-        private static (double x, double y, double z, double distance) CalculateDirection(double[] from, double[] to)
+
+        // Caches for STEP entities.
+        private Dictionary<DirectionKey, Direction> _directionCache = new();
+        private Dictionary<CartesianPointKey, CartesianPoint> _pointCache = new();
+        private Dictionary<CartesianPointKey, Vertex> _vertexCache = new();
+        private Dictionary<EdgeKey, EdgeCurve> _edgeCache = new();
+
+        /// <summary>
+        /// Calculate the direction vector from two points.
+        /// </summary>
+        /// <param name="from"></param>
+        /// <param name="to"></param>
+        /// <returns></returns>
+        private static (double unitX, double unitY, double unitZ, double distance) CalculateUnitDirectionAndDistance(
+            double[] from, double[] to)
         {
             var dx = to[0] - from[0];
             var dy = to[1] - from[1];
@@ -44,21 +55,26 @@ namespace Bolsover.Converter
             return (dx, dy, dz, distance);
         }
 
-        // Helper: Calculate cross-product of two vectors
-        private static double[] CrossProduct(double[] v1, double[] v2)
+       /// <summary>
+       /// Calculate the cross product of two vectors.
+       /// </summary>
+       /// <param name="vector1"></param>
+       /// <param name="vector2"></param>
+       /// <returns></returns>
+        private static double[] CrossProduct(double[] vector1, double[] vector2)
         {
             return new[]
             {
-                v1[1] * v2[2] - v1[2] * v2[1],
-                v1[2] * v2[0] - v1[0] * v2[2],
-                v1[0] * v2[1] - v1[1] * v2[0]
+                vector1[1] * vector2[2] - vector1[2] * vector2[1],
+                vector1[2] * vector2[0] - vector1[0] * vector2[2],
+                vector1[0] * vector2[1] - vector1[1] * vector2[0]
             };
         }
 
-       /// <summary>
-       /// Normalize a vector.
-       /// </summary>
-       /// <param name="vector"></param>
+        /// <summary>
+        /// Normalize a vector.
+        /// </summary>
+        /// <param name="vector"></param>
         private static void NormalizeVector(double[] vector)
         {
             var length = Math.Sqrt(vector[0] * vector[0] + vector[1] * vector[1] + vector[2] * vector[2]);
@@ -73,32 +89,57 @@ namespace Bolsover.Converter
         /// </summary>
         /// <param name="vertex1"></param>
         /// <param name="vertex2"></param>
-        /// <param name="dir"></param>
-        /// <param name="tol"></param>
+        /// <param name="isForward"></param>
+        /// <param name="tolerance"></param>
         /// <returns></returns>
-        private EdgeCurve CreateEdgeCurve(Vertex vertex1, Vertex vertex2, bool dir, double tol)
+        private EdgeCurve CreateEdgeCurve(Vertex vertex1, Vertex vertex2, bool isForward, double tolerance)
         {
-            var linePoint1 = GetOrCreatePoint(_pointCache, vertex1.CartesianPoint.X, vertex1.CartesianPoint.Y, vertex1.CartesianPoint.Z, tol);
+            var linePoint1 = GetOrCreatePoint(_pointCache, vertex1.CartesianPoint.X, vertex1.CartesianPoint.Y,
+                vertex1.CartesianPoint.Z, tolerance);
 
-            var (vx, vy, vz, _) = CalculateDirection(
+            var (vx, vy, vz, _) = CalculateUnitDirectionAndDistance(
                 new[] { vertex1.CartesianPoint.X, vertex1.CartesianPoint.Y, vertex1.CartesianPoint.Z },
                 new[] { vertex2.CartesianPoint.X, vertex2.CartesianPoint.Y, vertex2.CartesianPoint.Z }
             );
 
-            var lineDir1 = GetOrCreateDirection(_directionCache, vx, vy, vz, tol);
+            var lineDir1 = GetOrCreateDirection(_directionCache, vx, vy, vz, tolerance);
             var lineVector1 = Register(new Vector(NextId(), lineDir1, 1.0));
             var line1 = Register(new Line(NextId(), linePoint1, lineVector1));
             var surfCurve1 = Register(new SurfaceCurve(NextId(), line1));
-            return Register(new EdgeCurve(NextId(), vertex1, vertex2, surfCurve1, dir));
+            return Register(new EdgeCurve(NextId(), vertex1, vertex2, surfCurve1, isForward));
         }
 
+        
         /// <summary>
-        /// Caches for STEP entities.
+        /// Try to compute a valid normalized triangle and reference direction.
+        /// Returns false when the triangle is degenerate w.r.t. the given tolerance.
         /// </summary>
-        private Dictionary<DirectionKey, Direction> _directionCache = new();
-        private Dictionary<CartesianPointKey, CartesianPoint> _pointCache = new();
-        private Dictionary<CartesianPointKey, Vertex> _vertexCache = new();
-        private Dictionary<EdgeKey, EdgeCurve> _edgeCache = new();
+        private static (bool hasValidNormal, double[] normal, double[] referenceDirection) TryComputeTriangleNormal(
+            double[] p0,
+            double[] p1,
+            double[] p2,
+            double tolerance)
+        {
+            var (d0X, d0Y, d0Z, dist0) = CalculateUnitDirectionAndDistance(p0, p1);
+            if (dist0 < tolerance)
+            {
+                return (false, Array.Empty<double>(), Array.Empty<double>());
+            }
+
+            var (d1X, d1Y, d1Z, dist1) = CalculateUnitDirectionAndDistance(p0, p2);
+            if (dist1 < tolerance)
+            {
+                return (false, Array.Empty<double>(), Array.Empty<double>());
+            }
+
+            double[] referenceDirection = { d0X, d0Y, d0Z };
+            double[] d1 = { d1X, d1Y, d1Z };
+
+            var normal = CrossProduct(referenceDirection, d1);
+            NormalizeVector(normal);
+
+            return (true, normal, referenceDirection);
+        }
 
         /// <summary>
         /// Build a body from a list of triangles
@@ -106,13 +147,14 @@ namespace Bolsover.Converter
         /// <param name="triangleList"></param>
         /// <param name="tolerance"></param>
         /// <param name="mergedEdgeCount"></param>
-
         public void BuildTriangularBody(List<double> triangleList, double tolerance, ref int mergedEdgeCount)
         {
+            var triangleCount = triangleList.Count / ValuesPerTriangle;
+
             _directionCache = new Dictionary<DirectionKey, Direction>();
             _pointCache = new Dictionary<CartesianPointKey, CartesianPoint>();
-            _vertexCache = new Dictionary<CartesianPointKey, Vertex>(capacity: triangleList.Count / 3);
-            _edgeCache = new Dictionary<EdgeKey, EdgeCurve>(capacity: triangleList.Count);
+            _vertexCache = new Dictionary<CartesianPointKey, Vertex>(capacity: triangleCount * 3);
+            _edgeCache = new Dictionary<EdgeKey, EdgeCurve>(capacity: triangleCount * 3);
 
             var originPoint = GetOrCreatePoint(_pointCache, 0.0, 0.0, 0.0, tolerance);
             var direction1 = GetOrCreateDirection(_directionCache, 0.0, 0.0, 1.0, tolerance);
@@ -120,32 +162,26 @@ namespace Bolsover.Converter
             var axisPlacement3D = Register(new AxisPlacement3D(NextId(), direction1, direction2, originPoint));
             var faces = new List<Face>();
 
-            for (var i = 0; i < triangleList.Count / 9; i++)
+            for (var i = 0; i < triangleCount; i++)
             {
-                double[] p0 = { triangleList[i * 9 + 0], triangleList[i * 9 + 1], triangleList[i * 9 + 2] };
-                double[] p1 = { triangleList[i * 9 + 3], triangleList[i * 9 + 4], triangleList[i * 9 + 5] };
-                double[] p2 = { triangleList[i * 9 + 6], triangleList[i * 9 + 7], triangleList[i * 9 + 8] };
+                GetTrianglePoints(triangleList, i, out var p0, out var p1, out var p2);
 
-                // Compute directions
-                var (d0X, d0Y, d0Z, dist0) = CalculateDirection(p0, p1);
-                if (dist0 < tolerance) continue;
-                double[] d0 = { d0X, d0Y, d0Z };
+                var (hasValidNormal, normal, referenceDirection) =
+                    TryComputeTriangleNormal(p0, p1, p2, tolerance);
 
-                var (d1X, d1Y, d1Z, dist1) = CalculateDirection(p0, p2);
-                if (dist1 < tolerance) continue;
-                double[] d1 = { d1X, d1Y, d1Z };
-
-                // Cross-product for normal
-                var d2 = CrossProduct(d0, d1);
-                NormalizeVector(d2);
+                if (!hasValidNormal)
+                    continue;
 
                 var vert1 = GetOrCreateVertex(_vertexCache, p0[0], p0[1], p0[2], tolerance);
                 var vert2 = GetOrCreateVertex(_vertexCache, p1[0], p1[1], p1[2], tolerance);
                 var vert3 = GetOrCreateVertex(_vertexCache, p2[0], p2[1], p2[2], tolerance);
 
-                var edgeCurve1 = GetOrCreateEdge(_edgeCache, vert1, vert2, tolerance, out var edgeDir1, ref mergedEdgeCount);
-                var edgeCurve2 = GetOrCreateEdge(_edgeCache, vert2, vert3, tolerance, out var edgeDir2, ref mergedEdgeCount);
-                var edgeCurve3 = GetOrCreateEdge(_edgeCache, vert3, vert1, tolerance, out var edgeDir3, ref mergedEdgeCount);
+                var edgeCurve1 = GetOrCreateEdge(_edgeCache, vert1, vert2, tolerance, out var edgeDir1,
+                    ref mergedEdgeCount);
+                var edgeCurve2 = GetOrCreateEdge(_edgeCache, vert2, vert3, tolerance, out var edgeDir2,
+                    ref mergedEdgeCount);
+                var edgeCurve3 = GetOrCreateEdge(_edgeCache, vert3, vert1, tolerance, out var edgeDir3,
+                    ref mergedEdgeCount);
 
                 var orientedEdges = new List<OrientedEdge>
                 {
@@ -154,12 +190,8 @@ namespace Bolsover.Converter
                     Register(new OrientedEdge(NextId(), edgeCurve3, edgeDir3))
                 };
 
-                // Plane and axisPlacement
-                var planePoint = GetOrCreatePoint(_pointCache, p0[0], p0[1], p0[2], tolerance);
-                var planeDir1 = GetOrCreateDirection(_directionCache, d2[0], d2[1], d2[2], tolerance);
-                var planeDir2 = GetOrCreateDirection(_directionCache, d0[0], d0[1], d0[2], tolerance);
-                var axisPlacementIn = Register(new AxisPlacement3D(NextId(), planeDir1, planeDir2, planePoint));
-                var plane = Register(new Plane(NextId(), axisPlacementIn));
+                
+                var plane = CreatePlaneForTriangle(p0, normal, referenceDirection, tolerance);
                 var edgeLoop = Register(new EdgeLoop(NextId(), orientedEdges));
                 var faceBounds = new List<FaceBound> { Register(new FaceBound(NextId(), edgeLoop, true)) };
                 faces.Add(Register(new Face(NextId(), faceBounds, plane, true)));
@@ -170,6 +202,70 @@ namespace Bolsover.Converter
             var shellModel = Register(new ShellModel(NextId(), shells));
             // ReSharper disable once ObjectCreationAsStatement
             Register(new ManifoldShape(NextId(), axisPlacement3D, shellModel));
+        }
+        
+        /// <summary>
+        /// Create a plane for a triangle.
+        /// </summary>
+        /// <param name="triangleOrigin"></param>
+        /// <param name="triangleNormal"></param>
+        /// <param name="referenceDirection"></param>
+        /// <param name="tolerance"></param>
+        /// <returns></returns>
+        private Plane CreatePlaneForTriangle(double[] triangleOrigin, double[] triangleNormal, double[] referenceDirection, double tolerance)
+        {
+            var planePoint = GetOrCreatePoint(
+                _pointCache,
+                triangleOrigin[0],
+                triangleOrigin[1],
+                triangleOrigin[2],
+                tolerance);
+
+            var planeDirNormal = GetOrCreateDirection(
+                _directionCache,
+                triangleNormal[0],
+                triangleNormal[1],
+                triangleNormal[2],
+                tolerance);
+
+            var planeDirReference = GetOrCreateDirection(
+                _directionCache,
+                referenceDirection[0],
+                referenceDirection[1],
+                referenceDirection[2],
+                tolerance);
+
+            var axisPlacementIn = Register(new AxisPlacement3D(NextId(), planeDirNormal, planeDirReference, planePoint));
+            return Register(new Plane(NextId(), axisPlacementIn));
+        }
+
+
+        /// <summary>
+        /// Helper to read three points (a triangle) from a flat coordinate list.
+        /// </summary>
+        private static void GetTrianglePoints(List<double> triangleList, int triangleIndex,
+            out double[] p0, out double[] p1, out double[] p2)
+        {
+            var baseIndex = triangleIndex * ValuesPerTriangle;
+
+            p0 = new[]
+            {
+                triangleList[baseIndex + 0],
+                triangleList[baseIndex + 1],
+                triangleList[baseIndex + 2]
+            };
+            p1 = new[]
+            {
+                triangleList[baseIndex + 3],
+                triangleList[baseIndex + 4],
+                triangleList[baseIndex + 5]
+            };
+            p2 = new[]
+            {
+                triangleList[baseIndex + 6],
+                triangleList[baseIndex + 7],
+                triangleList[baseIndex + 8]
+            };
         }
 
         /// <summary>
@@ -202,7 +298,8 @@ namespace Bolsover.Converter
         /// <param name="z"></param>
         /// <param name="tol"></param>
         /// <returns></returns>
-        private CartesianPoint GetOrCreatePoint(Dictionary<CartesianPointKey, CartesianPoint> pointCache, double x, double y, double z, double tol)
+        private CartesianPoint GetOrCreatePoint(Dictionary<CartesianPointKey, CartesianPoint> pointCache, double x,
+            double y, double z, double tol)
         {
             var pk = new CartesianPointKey(x, y, z, tol);
             if (pointCache.TryGetValue(pk, out var p)) return p;
@@ -221,7 +318,8 @@ namespace Bolsover.Converter
         /// <param name="z"></param>
         /// <param name="tol"></param>
         /// <returns></returns>
-        private Vertex GetOrCreateVertex(Dictionary<CartesianPointKey, Vertex> vertexCache, double x, double y, double z,
+        private Vertex GetOrCreateVertex(Dictionary<CartesianPointKey, Vertex> vertexCache, double x, double y,
+            double z,
             double tol)
         {
             var pk = new CartesianPointKey(x, y, z, tol);
@@ -267,7 +365,7 @@ namespace Bolsover.Converter
             }
 
             // Not found — create and store once (store as forward by convention)
-            var ec = CreateEdgeCurve(v1, v2, dir: true, tol);
+            var ec = CreateEdgeCurve(v1, v2, isForward: true, tol);
             edgeCache.Add(keyF, ec);
             edgeDir = true;
             return ec;
@@ -302,7 +400,7 @@ namespace Bolsover.Converter
         }
     }
 
-   
+
     internal readonly struct CartesianPointKey : IEquatable<CartesianPointKey>
     {
         private readonly long _x;
