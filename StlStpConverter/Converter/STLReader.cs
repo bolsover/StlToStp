@@ -248,7 +248,7 @@ namespace Bolsover.Converter
             return await ConvertToStp(inputFile, outputFile, tol, CancellationToken.None, null);
         }
 
-        public static async Task<int> ConvertToStp(string inputFile, string outputFile, double tol, CancellationToken token,
+        private static async Task<int> ConvertToStp(string inputFile, string outputFile, double tol, CancellationToken token,
             IProgress<string> progress)
         {
             progress?.Report($"Reading STL: {Path.GetFileName(inputFile)}...");

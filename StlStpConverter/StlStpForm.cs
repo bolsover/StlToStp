@@ -30,7 +30,9 @@ namespace Bolsover
             var aboutText = string.IsNullOrWhiteSpace(version)
                 ? "STL->STEP Converter"
                 : $"STL->STEP Converter\nVersion: {version}";
-            aboutText = aboutText + "\nCopyright © David Bolsover 2025";
+            aboutText = aboutText + "\nCopyright © 2025, David Bolsover ";
+            aboutText = aboutText + "\nInspired by original work";
+            aboutText = aboutText + "\nCopyright © 2018, slugdev";
             MessageBox.Show(aboutText, "About", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
