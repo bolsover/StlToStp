@@ -3,6 +3,10 @@
 	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=D_003A_005CAlibreLib_005CAlibreX_002Edll/@EntryIndexedValue">True</s:Boolean>
 	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003AEnum_002Ecs_002Fl_003AC_0021_003FUsers_003FDavidBolsover_003FAppData_003FRoaming_003FJetBrains_003FRider2025_002E3_003Fresharper_002Dhost_003FDecompilerCache_003Fdecompiler_003Ffb7fbef2d0654c64811ce974c7a37c20573620_003F80_003F42bc544d_003FEnum_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
 	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003AVector3_002Ecs_002Fl_003AC_0021_003FUsers_003FDavidBolsover_003FAppData_003FRoaming_003FJetBrains_003FRider2025_002E3_003Fresharper_002Dhost_003FDecompilerCache_003Fdecompiler_003Ff6c66a318fe141ddae2028db11194a4620f98_003F7c_003F43e1342e_003FVector3_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/Environment/AssemblyExplorer/XmlDocument/@EntryValue">&lt;AssemblyExplorer&gt;&#xD;
+  &lt;Assembly Path="D:\02_Repository\02_Bolsover\StlStpConverter\packages\PriorityQueue.0.1.0\lib\net45\ConcurrentPriorityQueue.dll" /&gt;&#xD;
+  &lt;Assembly Path="D:\02_Repository\02_Bolsover\StlStpConverter\packages\PriorityQueues.2.0.2\lib\netstandard2.0\PriorityQueues.dll" /&gt;&#xD;
+&lt;/AssemblyExplorer&gt;</s:String>
 	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=06cc24d4_002Dc0ca_002D4878_002D8625_002D7601bedd5129/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" Name="Test1" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
   &lt;TestAncestor&gt;&#xD;
     &lt;TestId&gt;NUnit3x::17048E5D-B4D6-4F04-9AF6-AE9985E65309::.NETFramework,Version=v4.8.1::TestStlToStp.Tests.Test1&lt;/TestId&gt;&#xD;
@@ -27,5 +31,6 @@
     &lt;TestId&gt;NUnit3x::17048E5D-B4D6-4F04-9AF6-AE9985E65309::.NETFramework,Version=v4.8.1::TestStlToStp.TriangleTests.SeparateBodies&lt;/TestId&gt;&#xD;
     &lt;TestId&gt;NUnit3x::17048E5D-B4D6-4F04-9AF6-AE9985E65309::.NETFramework,Version=v4.8.1::TestStlToStp.TriangleTests&lt;/TestId&gt;&#xD;
     &lt;TestId&gt;NUnit3x::17048E5D-B4D6-4F04-9AF6-AE9985E65309::.NETFramework,Version=v4.8.1::TestStlToStp.SplitteratorTests&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;NUnit3x::17048E5D-B4D6-4F04-9AF6-AE9985E65309::.NETFramework,Version=v4.8.1::TestStlToStp.DecimatorTests.TestDecimate&lt;/TestId&gt;&#xD;
   &lt;/TestAncestor&gt;&#xD;
 &lt;/SessionState&gt;</s:String></wpf:ResourceDictionary>

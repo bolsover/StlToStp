@@ -1,10 +1,14 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Linq;
+using System.Text.RegularExpressions;
 using System.IO;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Bolsover.Converter;
+using Bolsover.Splitterator;
 
 namespace Bolsover
 {
@@ -23,6 +27,7 @@ namespace Bolsover
             outputButton.Click += OutputButton_Click;
             cancelButton.Click += CancelButton_Click;
             openChkBox.CheckedChanged += OpenChkBox_CheckedChanged;
+            splitCheckBox.CheckedChanged += splitCheckBox_CheckedChanged;
         }
 
 
@@ -91,6 +96,7 @@ namespace Bolsover
             outputButton.Enabled = false;
             comboBox.Enabled = false;
             openChkBox.Enabled = false;
+            splitCheckBox.Enabled = false;
             cancelButton.Enabled = true;
             progressBar.Visible = true;
             progressBar.Style = ProgressBarStyle.Marquee;
@@ -146,31 +152,136 @@ namespace Bolsover
                     openAfter = dlgResult == DialogResult.Yes;
                 }
 
-                _converterParams.Message = $"Read {triCount:N0} triangles. Building STEP body...";
-
-                // Build STEP model from nodes
-                var stepWriter = new StepWriter();
-                var mergedEdgeCount = 0;
-                token.ThrowIfCancellationRequested();
-                stepWriter.BuildTriangularBody(nodes, tol, ref mergedEdgeCount);
-                token.ThrowIfCancellationRequested();
-
-                _converterParams.Message = $"Writing STEP: {Path.GetFileName(_converterParams.OutFile)}...";
-                stepWriter.WriteStep(_converterParams.OutFile);
-
-                if (!token.IsCancellationRequested)
+                if (_converterParams.UseSplitterator)
                 {
-                    _converterParams.Message = @"Conversion complete";
+                    // Split into bodies and convert each body to a separate STEP file
+                    var outDir = Path.GetDirectoryName(_converterParams.OutFile);
+                    if (string.IsNullOrWhiteSpace(outDir)) outDir = Environment.CurrentDirectory;
 
-                    if (openAfter)
+                    // Snapshot existing body_*.stl files to detect new ones produced by the splitterator
+                    var before = new HashSet<string>(Directory.GetFiles(outDir, "body_*.stl"), StringComparer.OrdinalIgnoreCase);
+
+                    _converterParams.Message = "Splitting STL into separate bodies...";
+                    // Run potentially heavy split on a background thread, honor cancellation
+                    await Task.Run(() => StlSplitterator.SeparateBodies(_converterParams.InFile, outDir), token);
+                    token.ThrowIfCancellationRequested();
+
+                    var after = Directory.GetFiles(outDir, "body_*.stl");
+                    var newBodies = after.Where(p => !before.Contains(p)).ToList();
+
+                    if (newBodies.Count == 0)
                     {
+                        _converterParams.Message = "No separate bodies were detected in the STL.";
+                        return;
+                    }
+
+                    // Order by numeric suffix if possible: body_<n>.stl
+                    int ExtractIndex(string path)
+                    {
+                        var m = Regex.Match(Path.GetFileName(path) ?? string.Empty, @"body_(\d+)\.stl", RegexOptions.IgnoreCase);
+                        return m.Success ? int.Parse(m.Groups[1].Value) : int.MaxValue;
+                    }
+
+                    newBodies = newBodies.OrderBy(ExtractIndex).ToList();
+
+                    var baseOutName = Path.GetFileNameWithoutExtension(_converterParams.OutFile);
+                    var outExt = Path.GetExtension(_converterParams.OutFile);
+                    if (string.IsNullOrEmpty(outExt)) outExt = ".stp";
+
+                    var producedSteps = new List<string>();
+
+                    for (int i = 0; i < newBodies.Count; i++)
+                    {
+                        token.ThrowIfCancellationRequested();
+                        var bodyStl = newBodies[i];
+                        var idx = ExtractIndex(bodyStl);
+                        var n = (idx == int.MaxValue ? i + 1 : idx);
+
+                        // Compute desired STL name to match the STEP base name but with .stl
+                        var desiredStlPath = Path.Combine(outDir, $"{baseOutName}_body_{n}.stl");
+
                         try
                         {
-                            Process.Start(_converterParams.OutFile);
+                            // If the current filename differs, rename/move it to the desired name
+                            if (!string.Equals(Path.GetFullPath(bodyStl), Path.GetFullPath(desiredStlPath), StringComparison.OrdinalIgnoreCase))
+                            {
+                                if (File.Exists(desiredStlPath))
+                                {
+                                    // Overwrite by deleting existing target
+                                    File.Delete(desiredStlPath);
+                                }
+                                File.Move(bodyStl, desiredStlPath);
+                                bodyStl = desiredStlPath; // update reference to renamed file
+                            }
                         }
-                        catch
+                        catch (Exception renameEx)
                         {
-                            /* ignore */
+                            // If rename fails, continue with the original path but report the issue
+                            _converterParams.Message = $"Warning: Could not rename split STL to '{desiredStlPath}': {renameEx.Message}";
+                        }
+
+                        var stepOut = Path.Combine(outDir, $"{baseOutName}_body_{n}{outExt}");
+
+                        _converterParams.Message = $"Converting body {n} to STEP...";
+
+                        // Read body STL nodes and convert
+                        var bodyNodes = await StlReader.ReadStlAsync(bodyStl, token, progress);
+                        var bodyTriCount = bodyNodes.Count / 9;
+                        if (bodyTriCount == 0) continue;
+
+                        var stepWriterBody = new StepWriter();
+                        var mergedEdgesBody = 0;
+                        stepWriterBody.BuildTriangularBody(bodyNodes, tol, ref mergedEdgesBody);
+                        stepWriterBody.WriteStep(stepOut);
+
+                        producedSteps.Add(stepOut);
+                    }
+
+                    if (!token.IsCancellationRequested)
+                    {
+                        _converterParams.Message = $"Conversion complete: {producedSteps.Count} STEP file(s) written to '{outDir}'.";
+                        if (openAfter)
+                        {
+                            try
+                            {
+                                // Open the output folder in Explorer for convenience
+                                Process.Start("explorer.exe", outDir);
+                            }
+                            catch
+                            {
+                                /* ignore */
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    _converterParams.Message = $"Read {triCount:N0} triangles. Building STEP body...";
+
+                    // Build STEP model from nodes
+                    var stepWriter = new StepWriter();
+                    var mergedEdgeCount = 0;
+                    token.ThrowIfCancellationRequested();
+                    stepWriter.BuildTriangularBody(nodes, tol, ref mergedEdgeCount);
+                    token.ThrowIfCancellationRequested();
+
+                    _converterParams.Message = $"Writing STEP: {Path.GetFileName(_converterParams.OutFile)}...";
+                    stepWriter.WriteStep(_converterParams.OutFile);
+
+                    if (!token.IsCancellationRequested)
+                    {
+                        _converterParams.Message = @"Conversion complete";
+
+                        if (openAfter)
+                        {
+                            try
+                            {
+                                Process.Start(_converterParams.OutFile);
+                            }
+                            catch
+                            {
+                                /* ignore */
+                            }
                         }
                     }
                 }
@@ -193,6 +304,7 @@ namespace Bolsover
                 outputButton.Enabled = true;
                 comboBox.Enabled = true;
                 openChkBox.Enabled = true;
+                splitCheckBox.Enabled = true;
                 _converterParams.InFile = "";
                 _converterParams.OutFile = "";
                 _cts.Dispose();
@@ -203,6 +315,13 @@ namespace Bolsover
         private void OpenChkBox_CheckedChanged(object sender, EventArgs e)
         {
             _converterParams.OpenConverted = openChkBox.Checked;
+           
+        }
+
+        private void splitCheckBox_CheckedChanged(object sender, EventArgs e)
+        {
+            _converterParams.UseSplitterator = splitCheckBox.Checked;
+            openChkBox.Text = _converterParams.UseSplitterator ? @"Split, convert, open directory" : @"Open STL after conversion";
         }
     }
 }

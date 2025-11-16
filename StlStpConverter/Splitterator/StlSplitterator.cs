@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -362,7 +363,7 @@ namespace Bolsover.Splitterator
             var visited = new bool[n];
             var queue = new Queue<int>(Math.Min(1024, n));
 
-            for (int i = 0; i < n; i++)
+            for (var i = 0; i < n; i++)
             {
                 if (visited[i]) continue;
                 var compIdxs = new List<int>();
@@ -371,47 +372,35 @@ namespace Bolsover.Splitterator
 
                 while (queue.Count > 0)
                 {
-                    int current = queue.Dequeue();
+                    var current = queue.Dequeue();
                     compIdxs.Add(current);
                     var ids = triVerts[current];
 
                     List<int> neigh;
                     if (edgeToTris.TryGetValue(new EdgeKey(ids[0], ids[1]), out neigh))
-                        for (int k = 0; k < neigh.Count; k++)
+                        foreach (var nb in neigh.Where(nb => !visited[nb]))
                         {
-                            int nb = neigh[k];
-                            if (!visited[nb])
-                            {
-                                visited[nb] = true;
-                                queue.Enqueue(nb);
-                            }
+                            visited[nb] = true;
+                            queue.Enqueue(nb);
                         }
 
                     if (edgeToTris.TryGetValue(new EdgeKey(ids[1], ids[2]), out neigh))
-                        for (int k = 0; k < neigh.Count; k++)
+                        foreach (var nb in neigh.Where(nb => !visited[nb]))
                         {
-                            int nb = neigh[k];
-                            if (!visited[nb])
-                            {
-                                visited[nb] = true;
-                                queue.Enqueue(nb);
-                            }
+                            visited[nb] = true;
+                            queue.Enqueue(nb);
                         }
 
                     if (edgeToTris.TryGetValue(new EdgeKey(ids[2], ids[0]), out neigh))
-                        for (int k = 0; k < neigh.Count; k++)
+                        foreach (var nb in neigh.Where(nb => !visited[nb]))
                         {
-                            int nb = neigh[k];
-                            if (!visited[nb])
-                            {
-                                visited[nb] = true;
-                                queue.Enqueue(nb);
-                            }
+                            visited[nb] = true;
+                            queue.Enqueue(nb);
                         }
                 }
 
                 var group = new List<Triangle>(compIdxs.Count);
-                for (int k = 0; k < compIdxs.Count; k++) group.Add(triangles[compIdxs[k]]);
+                for (var k = 0; k < compIdxs.Count; k++) group.Add(triangles[k]);
                 result.Add(group);
             }
 
@@ -420,14 +409,17 @@ namespace Bolsover.Splitterator
         
         public static void SeparateBodies(string inFile, string outDir)
         {
-            string path = "Pencil Case.stl";
-            var triangles = ParseStl(path);
+            //string path = "Pencil Case.stl";
+            var triangles = ParseStl(inFile);
             var bodies = GetConnectedComponents(triangles);
 
-            for (int i = 0; i < bodies.Count; i++)
+            for (var i = 0; i < bodies.Count; i++)
             {
-                string outputPath = $"body_{i + 1}.stl";
-                WriteAsciiStl(outputPath, bodies[i], $"body_{i + 1}");
+                var outputPath = $"body_{i + 1}.stl";
+                outputPath = Path.Combine(outDir, outputPath);
+                var baseName = Path.GetFileNameWithoutExtension(inFile);
+                var solidName = $"{baseName}_body_{i + 1}";
+                WriteAsciiStl(outputPath, bodies[i], solidName);
                 Console.WriteLine($"Exported: {outputPath}");
             }
         }

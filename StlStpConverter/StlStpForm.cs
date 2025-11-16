@@ -54,5 +54,11 @@ namespace Bolsover
                 return null;
             }
         }
+
+        private void usageToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            HelpForm helpForm = new();
+            helpForm.ShowDialog();
+        }
     }
 }

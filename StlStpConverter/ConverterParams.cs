@@ -9,6 +9,7 @@ namespace Bolsover
         private string _outFile;
         private double _tol;
         private bool _openConverted;
+        private bool _useSplitterator;
         private string _message;
 
         public string InFile
@@ -39,6 +40,12 @@ namespace Bolsover
         {
             get => _message;
             set => SetField(ref _message, value);
+        }
+
+        public bool UseSplitterator
+        {
+            get => _useSplitterator;
+            set => SetField(ref _useSplitterator, value);
         }
 
         public ConverterParams()

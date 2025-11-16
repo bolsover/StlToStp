@@ -24,16 +24,18 @@ namespace TestStlToStp
         [Test]
         public static void SeparateBodies()
         {
-            string path = "roach_kit_card.stl";
-            var triangles = StlSplitterator.ParseStl(path);
-            var bodies = StlSplitterator.GetConnectedComponents(triangles);
-
-            for (int i = 0; i < bodies.Count; i++)
-            {
-                string outputPath = $"body_{i + 1}.stl";
-                StlSplitterator.WriteAsciiStl(outputPath, bodies[i], $"body_{i + 1}");
-                Console.WriteLine($"Exported: {outputPath}");
-            }
+            // string path = "roach_kit_card.stl";
+            // var triangles = StlSplitterator.ParseStl(path);
+            // var bodies = StlSplitterator.GetConnectedComponents(triangles);
+            //
+            // for (int i = 0; i < bodies.Count; i++)
+            // {
+            //     string outputPath = $"body_{i + 1}.stl";
+            //     StlSplitterator.WriteAsciiStl(outputPath, bodies[i], $"body_{i + 1}");
+            //     Console.WriteLine($"Exported: {outputPath}");
+            // }
+            StlSplitterator.SeparateBodies("roach_kit_card.stl", "D:\\02_Repositop, ory\\02_Bolsover\\StlStpConverter\\TestStlStpConverter");
+            
         }
     }
 }
