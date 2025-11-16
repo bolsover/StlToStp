@@ -4,6 +4,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Numerics;
+using System.Threading;
+using System.Threading.Tasks;
+using Bolsover.Converter;
 
 namespace Bolsover.Splitterator
 {
@@ -12,73 +15,107 @@ namespace Bolsover.Splitterator
     public abstract class StlSplitterator
         {
 
+        /// <summary>
+        /// Synchronous STL parser that delegates to the async implementation.
+        /// Prefer using <see cref="ParseStlAsync"/> in new code for non-blocking I/O.
+        /// </summary>
         public static List<Triangle> ParseStl(string path)
         {
-            using var stream = File.OpenRead(path);
-            using var reader = new BinaryReader(stream);
-
-            // Check if ASCII or Binary
-            var header = reader.ReadBytes(80);
-            var isAscii = System.Text.Encoding.ASCII.GetString(header).Contains("solid");
-            stream.Seek(0, SeekOrigin.Begin); // Reset stream
-            return isAscii ? ParseAsciiStl(stream) : ParseBinaryStl(reader);
+            // Delegate to async version to ensure a single I/O implementation path.
+            return ParseStlAsync(path).GetAwaiter().GetResult();
         }
 
-        private static List<Triangle> ParseAsciiStl(Stream stream)
+        /// <summary>
+        /// Asynchronously reads an STL file using <see cref="StlReader.ReadStlAsync"/> and converts the
+        /// returned node list (x, y, z flattened) into a list of <see cref="Triangle"/> objects.
+        /// </summary>
+        /// <param name="path">Path to the STL file.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <param name="progress">Optional textual progress reporter.</param>
+        /// <returns>List of triangles parsed from the STL file.</returns>
+        public static async Task<List<Triangle>> ParseStlAsync(string path, CancellationToken token = default, IProgress<string> progress = null)
         {
-            var triangles = new List<Triangle>();
-            using var reader = new StreamReader(stream);
-            string line;
-            while ((line = reader.ReadLine()) != null)
-            {
-                if (line.Trim().StartsWith("facet normal"))
-                {
-                    var triangle = new Triangle();
-                    reader.ReadLine(); // outer loop
-                    for (int v = 0; v < 3; v++)
-                    {
-                        var parts = reader.ReadLine().Trim().Split(' ');
-                        triangle.Vertices[v] = new Vector3(
-                            float.Parse(parts[1]),
-                            float.Parse(parts[2]),
-                            float.Parse(parts[3])
-                        );
-                    }
+            var nodes = await StlReader.ReadStlAsync(path, token, progress).ConfigureAwait(false);
+            return ConvertNodesToTriangles(nodes);
+        }
 
-                    reader.ReadLine(); // endloop
-                    reader.ReadLine(); // endfacet
-                    triangles.Add(triangle);
-                }
+        /// <summary>
+        /// Converts a flattened list of doubles [x0,y0,z0, x1,y1,z1, x2,y2,z2, ...] coming from the
+        /// STL reader into a list of <see cref="Triangle"/> instances.
+        /// </summary>
+        private static List<Triangle> ConvertNodesToTriangles(List<double> nodes)
+        {
+            var triangles = new List<Triangle>(nodes == null ? 0 : nodes.Count / 9);
+            if (nodes == null || nodes.Count < 9) return triangles;
+
+            for (int i = 0; i + 8 < nodes.Count; i += 9)
+            {
+                var tri = new Triangle();
+                tri.Vertices[0] = new Vector3((float)nodes[i],     (float)nodes[i + 1], (float)nodes[i + 2]);
+                tri.Vertices[1] = new Vector3((float)nodes[i + 3], (float)nodes[i + 4], (float)nodes[i + 5]);
+                tri.Vertices[2] = new Vector3((float)nodes[i + 6], (float)nodes[i + 7], (float)nodes[i + 8]);
+                triangles.Add(tri);
             }
 
             return triangles;
         }
 
-        private static List<Triangle> ParseBinaryStl(BinaryReader reader)
-        {
-            reader.BaseStream.Seek(80, SeekOrigin.Begin); // skip header
-            uint triangleCount = reader.ReadUInt32();
-            var triangles = new List<Triangle>((int)triangleCount);
-
-            for (int i = 0; i < triangleCount; i++)
-            {
-                reader.ReadBytes(12); // normal vector
-                var triangle = new Triangle();
-                for (int v = 0; v < 3; v++)
-                {
-                    triangle.Vertices[v] = new Vector3(
-                        reader.ReadSingle(),
-                        reader.ReadSingle(),
-                        reader.ReadSingle()
-                    );
-                }
-
-                reader.ReadUInt16(); // attribute byte count
-                triangles.Add(triangle);
-            }
-
-            return triangles;
-        }
+        // // Legacy local parsers retained for reference; no longer used by default code path.
+        // private static List<Triangle> ParseAsciiStl(Stream stream)
+        // {
+        //     var triangles = new List<Triangle>();
+        //     using var reader = new StreamReader(stream);
+        //     string line;
+        //     while ((line = reader.ReadLine()) != null)
+        //     {
+        //         if (line.Trim().StartsWith("facet normal"))
+        //         {
+        //             var triangle = new Triangle();
+        //             reader.ReadLine(); // outer loop
+        //             for (int v = 0; v < 3; v++)
+        //             {
+        //                 var parts = reader.ReadLine().Trim().Split(' ');
+        //                 triangle.Vertices[v] = new Vector3(
+        //                     float.Parse(parts[1]),
+        //                     float.Parse(parts[2]),
+        //                     float.Parse(parts[3])
+        //                 );
+        //             }
+        //
+        //             reader.ReadLine(); // endloop
+        //             reader.ReadLine(); // endfacet
+        //             triangles.Add(triangle);
+        //         }
+        //     }
+        //
+        //     return triangles;
+        // }
+        //
+        // private static List<Triangle> ParseBinaryStl(BinaryReader reader)
+        // {
+        //     reader.BaseStream.Seek(80, SeekOrigin.Begin); // skip header
+        //     uint triangleCount = reader.ReadUInt32();
+        //     var triangles = new List<Triangle>((int)triangleCount);
+        //
+        //     for (int i = 0; i < triangleCount; i++)
+        //     {
+        //         reader.ReadBytes(12); // normal vector
+        //         var triangle = new Triangle();
+        //         for (int v = 0; v < 3; v++)
+        //         {
+        //             triangle.Vertices[v] = new Vector3(
+        //                 reader.ReadSingle(),
+        //                 reader.ReadSingle(),
+        //                 reader.ReadSingle()
+        //             );
+        //         }
+        //
+        //         reader.ReadUInt16(); // attribute byte count
+        //         triangles.Add(triangle);
+        //     }
+        //
+        //     return triangles;
+        // }
 
 
 

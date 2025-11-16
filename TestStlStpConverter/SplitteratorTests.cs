@@ -13,7 +13,7 @@ namespace TestStlToStp
         [Test]
         public static void Triangles()
         {
-            string path = "Pencil Case.stl";
+            string path = "roach_kit_card.stl";
             var triangles = StlSplitterator.ParseStl(path);
             var tianglscount = triangles.Count;
             Console.WriteLine($"Number of triangles: {tianglscount}");
@@ -24,7 +24,7 @@ namespace TestStlToStp
         [Test]
         public static void SeparateBodies()
         {
-            string path = "Geneva.stl";
+            string path = "roach_kit_card.stl";
             var triangles = StlSplitterator.ParseStl(path);
             var bodies = StlSplitterator.GetConnectedComponents(triangles);
 

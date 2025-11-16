@@ -84,14 +84,14 @@ namespace Bolsover.Converter
             static async Task<List<double>> ReadBinaryWithBlockCopyAsync(string path, CancellationToken ct, IProgress<string> prog)
             {
                 const int TriBytes = 50;     // 12 floats (48 bytes) + 2 attribute bytes
-                const int FloatsPerTri = 12; // 3 normal + 9 vertex
+                const int FloatsPerTri = 12; // 3 normal + 9 vertices
 
                 using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,
                     bufferSize: 64 * 1024, useAsync: true);
 
                 // Read 80-byte header + 4-byte triangle count
                 var header = new byte[84];
-                int hdrRead = await ReadExactlyAsync(fs, header, 0, 84, ct).ConfigureAwait(false);
+                var hdrRead = await ReadExactlyAsync(fs, header, 0, 84, ct).ConfigureAwait(false);
                 if (hdrRead != 84) throw new EndOfStreamException("Short STL header");
 
                 uint tris = BitConverter.ToUInt32(header, 80);
@@ -109,26 +109,26 @@ namespace Bolsover.Converter
                 {
                     ct.ThrowIfCancellationRequested();
 
-                    int trisThisChunk = (int)Math.Min(MaxTrisPerChunk, remainingBytes / TriBytes);
-                    int bytesThisChunk = trisThisChunk * TriBytes;
+                    var trisThisChunk = (int)Math.Min(MaxTrisPerChunk, remainingBytes / TriBytes);
+                    var bytesThisChunk = trisThisChunk * TriBytes;
                     if (bytesThisChunk == 0) break;
 
                     // Read exactly the bytes for this chunk
                     var chunk = ArrayPool<byte>.Shared.Rent(bytesThisChunk);
                     try
                     {
-                        int got = await ReadExactlyAsync(fs, chunk, 0, bytesThisChunk, ct).ConfigureAwait(false);
+                        var got = await ReadExactlyAsync(fs, chunk, 0, bytesThisChunk, ct).ConfigureAwait(false);
                         if (got != bytesThisChunk) throw new EndOfStreamException("Unexpected end of STL file");
 
                         // Rent float buffer for the 12 floats per triangle (normal + verts)
-                        int totalFloats = trisThisChunk * FloatsPerTri; // 12*tris
+                        var totalFloats = trisThisChunk * FloatsPerTri; // 12*tris
                         var floats = ArrayPool<float>.Shared.Rent(totalFloats);
                         try
                         {
                             // Copy 48 bytes of floats per triangle (skip 2-byte attribute) into float buffer
-                            int src = 0; // in bytes
-                            int dst = 0; // in bytes into float[]
-                            for (int t = 0; t < trisThisChunk; t++)
+                            var src = 0; // in bytes
+                            var dst = 0; // in bytes into float[]
+                            for (var t = 0; t < trisThisChunk; t++)
                             {
                                 Buffer.BlockCopy(chunk, src, floats, dst, 48); // 12 floats
                                 src += TriBytes; // advance by 50
@@ -136,8 +136,8 @@ namespace Bolsover.Converter
                             }
 
                             // Consume the floats: skip the 3 normal floats and add the 9 vertex floats
-                            int f = 0;
-                            for (int t = 0; t < trisThisChunk; t++)
+                            var f = 0;
+                            for (var t = 0; t < trisThisChunk; t++)
                             {
                                 f += 3; // skip normal
                                 result.Add(floats[f++]); result.Add(floats[f++]); result.Add(floats[f++]);
@@ -168,10 +168,10 @@ namespace Bolsover.Converter
             // Helper to read an exact number of bytes (like Stream.ReadExactly in newer .NET)
             static async Task<int> ReadExactlyAsync(Stream s, byte[] buffer, int offset, int count, CancellationToken ct)
             {
-                int total = 0;
+                var total = 0;
                 while (total < count)
                 {
-                    int read = await s.ReadAsync(buffer, offset + total, count - total, ct).ConfigureAwait(false);
+                    var read = await s.ReadAsync(buffer, offset + total, count - total, ct).ConfigureAwait(false);
                     if (read == 0) break;
                     total += read;
                 }
