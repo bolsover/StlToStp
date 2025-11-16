@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "AlibreStlStpConverter"
-#define MyAppVersion "2.0"
+#define MyAppVersion "2.1"
 #define MyAppPublisher "David Bolsover"
 #define MyAppURL "https://github.com/bolsover/StlStpConverter"
 
@@ -47,6 +47,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Files]
 Source: "D:\02_Repository\02_Bolsover\StlStpConverter\StlStpConverter\bin\Release\Microsoft.Bcl.HashCode.dll"; DestDir: "{app}"; Flags: ignoreversion; 
 Source: "D:\02_Repository\02_Bolsover\StlStpConverter\StlStpConverter\bin\Release\StlStpConverter.exe"; DestDir: "{app}"; Flags: ignoreversion; 
+Source: "D:\02_Repository\02_Bolsover\StlStpConverter\StlStpConverter\bin\Release\information.me"; DestDir: "{app}"; Flags: ignoreversion; 
 Source: "D:\02_Repository\02_Bolsover\StlStpConverter\StlStpConverter\bin\Release\System.Buffers.dll"; DestDir: "{app}"; Flags: ignoreversion; 
 Source: "D:\02_Repository\02_Bolsover\StlStpConverter\StlStpConverter\bin\Release\System.Numerics.Vectors.dll"; DestDir: "{app}"; Flags: ignoreversion; 
 Source: "D:\02_Repository\02_Bolsover\StlStpConverter\AlibreStlStpConverter\bin\Release\3DPrint.ico"; DestDir: "{app}"; Flags: ignoreversion; 
